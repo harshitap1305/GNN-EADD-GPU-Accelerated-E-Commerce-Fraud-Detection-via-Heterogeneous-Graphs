@@ -37,7 +37,6 @@ def load_graph_data():
 
     print("Mapping 128-D Float16 Features directly from SSD...")
     X_memmap = np.memmap('X_combined.memmap', dtype='float16', mode='r', shape=(num_nodes, 128))
-    # Wrapping in np.array() fixes the PyTorch read-only warning before moving to VRAM
     X_tensor = torch.from_numpy(np.array(X_memmap)).cuda() 
 
     return X_tensor, N_u, N_p, N_s, num_nodes, \
@@ -46,43 +45,80 @@ def load_graph_data():
            euu_rp, euu_ci
 
 # ---------------------------------------------------------
-# 2. Triple-Stream GAE Architecture
+# 2. Triple-Stream GAE Architecture (2-Layer, 128-D)
 # ---------------------------------------------------------
 class TripleStreamGAE(nn.Module):
-    def __init__(self, in_dim=128, hidden_dim=64):
+    def __init__(self, in_dim=128, hidden_dim=128, out_dim=128):
         super().__init__()
-        # Compression Layer (Encoder)
-        self.compressor = nn.Linear(in_dim, hidden_dim)
+        # --- LAYER 1 WEIGHTS ---
+        self.W1_pu = nn.Linear(in_dim, hidden_dim, bias=False)
+        self.W1_uu = nn.Linear(in_dim, hidden_dim, bias=False)
+        self.W1_up = nn.Linear(in_dim, hidden_dim, bias=False)
+        self.W1_ps = nn.Linear(in_dim, hidden_dim, bias=False)
+        self.W1_sp = nn.Linear(in_dim, hidden_dim, bias=False)
 
-    def forward(self, X, epu_rp, epu_ci, epu_T_rp, epu_T_ci, eps_rp, eps_ci, eps_T_rp, eps_T_ci, euu_rp, euu_ci):
+        # --- LAYER 2 WEIGHTS ---
+        self.W2_pu = nn.Linear(hidden_dim, out_dim, bias=False)
+        self.W2_uu = nn.Linear(hidden_dim, out_dim, bias=False)
+        self.W2_up = nn.Linear(hidden_dim, out_dim, bias=False)
+        self.W2_ps = nn.Linear(hidden_dim, out_dim, bias=False)
+        self.W2_sp = nn.Linear(hidden_dim, out_dim, bias=False)
+
+        # Explicit CUDA Streams for True Parallelism
+        self.stream_u = torch.cuda.Stream()
+        self.stream_p = torch.cuda.Stream()
+        self.stream_s = torch.cuda.Stream()
+
+    def _forward_layer(self, X_input, epu_rp, epu_ci, epu_T_rp, epu_T_ci, eps_rp, eps_ci, eps_T_rp, eps_T_ci, euu_rp, euu_ci, layer=1):
+        """Executes one single hop of Triple-Stream Graph Message Passing."""
+        torch.cuda.synchronize() # Sync default stream before branching
         
-        # --- STREAM 1: User Node Representation ---
-        H_pu = custom_spmm.forward(epu_rp, epu_ci, X)
-        H_uu = custom_spmm.forward(euu_rp, euu_ci, X)
-        H_user = (H_pu + H_uu) / 2.0
-
-        # --- STREAM 2: Product Node Representation ---
-        H_up = custom_spmm.forward(epu_T_rp, epu_T_ci, X)
-        H_ps = custom_spmm.forward(eps_rp, eps_ci, X)
-        H_product = (H_up + H_ps) / 2.0
-
-        # --- STREAM 3: Seller Node Representation ---
-        # Note: eps_T output maps back to the Seller dimension
-        H_sp = custom_spmm.forward(eps_T_rp, eps_T_ci, X)
-        H_seller = H_sp
-
-        # Re-concatenate the isolated streams back into a unified global matrix
-        H_combined = torch.cat([H_user, H_product, H_seller], dim=0)
+        # FIX: Downcast input back to Float16 (Half) for the aggressively optimized CUDA kernel
+        X_input = X_input.half()
         
-        # Compress down to 64-D Latent Space Z
-        Z = F.relu(self.compressor(H_combined))
+        # Select appropriate weights for Layer 1 or Layer 2
+        W_pu = self.W1_pu if layer == 1 else self.W2_pu
+        W_uu = self.W1_uu if layer == 1 else self.W2_uu
+        W_up = self.W1_up if layer == 1 else self.W2_up
+        W_ps = self.W1_ps if layer == 1 else self.W2_ps
+        W_sp = self.W1_sp if layer == 1 else self.W2_sp
+
+        # Stream 1: User Node Representation
+        with torch.cuda.stream(self.stream_u):
+            raw_pu = custom_spmm.forward(epu_rp, epu_ci, X_input)
+            raw_uu = custom_spmm.forward(euu_rp, euu_ci, X_input)
+            H_user = F.relu(W_pu(raw_pu) + W_uu(raw_uu))
+
+        # Stream 2: Product Node Representation
+        with torch.cuda.stream(self.stream_p):
+            raw_up = custom_spmm.forward(epu_T_rp, epu_T_ci, X_input)
+            raw_ps = custom_spmm.forward(eps_rp, eps_ci, X_input)
+            H_product = F.relu(W_up(raw_up) + W_ps(raw_ps))
+
+        # Stream 3: Seller Node Representation
+        with torch.cuda.stream(self.stream_s):
+            raw_sp = custom_spmm.forward(eps_T_rp, eps_T_ci, X_input)
+            H_seller = F.relu(W_sp(raw_sp))
+
+        # Wait for all 3 streams to finish parallel computations
+        torch.cuda.synchronize()
+
+        # Re-concatenate into unified [N_total, Dim] matrix for the next layer
+        return torch.cat([H_user, H_product, H_seller], dim=0)
+
+    def forward(self, X, *args):
+        # Layer 1: 1st Hop Neighborhood Aggregation
+        H1 = self._forward_layer(X, *args, layer=1)
+        
+        # Layer 2: 2nd Hop Neighborhood Aggregation -> Outputs final Latent Space Z (128-D)
+        Z = self._forward_layer(H1, *args, layer=2)
+        
         return Z
 
 # ---------------------------------------------------------
 # 3. Dynamic CSR Edge Sampler
 # ---------------------------------------------------------
 def sample_positive_edges(rp, ci, src_offset, num_samples):
-    """Dynamically reconstructs actual graph edges from CSR arrays for training."""
     row_lengths = rp[1:] - rp[:-1]
     src = torch.repeat_interleave(torch.arange(len(rp)-1, device=rp.device), row_lengths) + src_offset
     dst = ci
@@ -99,13 +135,17 @@ def sample_positive_edges(rp, ci, src_offset, num_samples):
 def train_gae():
     X, N_u, N_p, N_s, num_nodes, epu_rp, epu_ci, epu_T_rp, epu_T_ci, eps_rp, eps_ci, eps_T_rp, eps_T_ci, euu_rp, euu_ci = load_graph_data()
     
-    model = TripleStreamGAE(in_dim=128, hidden_dim=64).cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
+    # Corrected Latent Dimension to 128 as per Proposal Sec II.B
+    model = TripleStreamGAE(in_dim=128, hidden_dim=128, out_dim=128).cuda()
+    
+    # Optimizer specs exactly match Paper Sec V.A.4
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    print("\nStarting Stage 1: Unsupervised Training...")
+    print("\nStarting Stage 1: Unsupervised 2-Layer Training...")
     t0 = time.time()
     
-    for epoch in range(1, 101):
+    # Epochs exactly match Paper Sec V.A.4
+    for epoch in range(1, 201):
         model.train()
         optimizer.zero_grad()
 
@@ -113,7 +153,6 @@ def train_gae():
         Z = model(X, epu_rp, epu_ci, epu_T_rp, epu_T_ci, eps_rp, eps_ci, eps_T_rp, eps_T_ci, euu_rp, euu_ci)
 
         # 2. Sample True Edges from the CSR Graph (Reconstruction Targets)
-        # We sample 10,000 edges from the User-Product interactions
         pos_src, pos_dst = sample_positive_edges(epu_rp, epu_ci, src_offset=0, num_samples=10000)
         
         # Decode: Dot Product between true node pairs
@@ -137,11 +176,10 @@ def train_gae():
 
     print(f"\nTraining Complete in {time.time() - t0:.2f}s!")
     
-    # Extract Anomaly Scores (Nodes that fail reconstruction severely)
+    # Extract Anomaly Scores
     model.eval()
     with torch.no_grad():
         Z_final = model(X, epu_rp, epu_ci, epu_T_rp, epu_T_ci, eps_rp, eps_ci, eps_T_rp, eps_T_ci, euu_rp, euu_ci)
-        # Calculate how "far" each node is from the global graph norm (Anomaly Flag)
         anomaly_scores = torch.norm(Z_final - Z_final.mean(dim=0), dim=1).cpu().numpy()
         
     np.save('anomaly_scores.npy', anomaly_scores)
