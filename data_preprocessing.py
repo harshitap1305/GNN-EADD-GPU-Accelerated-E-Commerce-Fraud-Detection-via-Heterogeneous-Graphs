@@ -1,9 +1,6 @@
 """
-GNN-EADD Stage 1 Preprocessing Pipeline (Ultimate Edition - 16GB RAM Safe)
+GNN-EADD Stage 1 Preprocessing Pipeline
 ==========================================================================
-Combines SSD-streaming memory efficiency with strict GCN mathematical correctness.
-Eliminates Python string memory bloat via chunked on-the-fly NLP encoding.
-
 Outputs:
   - CSR Topology Binaries: epu_*, eps_*, euu_* (Includes Transposes & Self-Loops)
   - Memory-mapped features: V_p, V_u, V_s, and X_combined.memmap
@@ -25,9 +22,7 @@ from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 nltk.download('vader_lexicon', quiet=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Configuration
-# ─────────────────────────────────────────────────────────────────────────────
 
 REVIEWS_FILE  = "AMAZON_FASHION_5.json"
 METADATA_FILE = "meta_AMAZON_FASHION.json"
@@ -55,9 +50,7 @@ INVALID_BRANDS = {
     'no brand', 'no name', 'amazon', 'amazon.com', '', ' ',
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Utilities
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
@@ -136,14 +129,12 @@ def save_memmap(matrix: np.ndarray, filename: str) -> None:
     fp.flush()
     del fp
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Preprocessing Pipeline
-# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     t0 = time.time()
     _log("=" * 62)
-    _log("GNN-EADD Stage 1 Preprocessing Pipeline (16GB RAM Ultimate Edition)")
+    _log("GNN-EADD Stage 1 Preprocessing Pipeline (16GB RAM)")
     _log("=" * 62)
 
     # ─── PASS 1: Build Unified ID Space ──────────────────────────────────────
@@ -232,7 +223,7 @@ def main():
         su['neg'] += 1 if rating <= 2 else 0
 
     # ─── PASS 3: Generate Feature Matrices & Chunked Encoding ────────────────
-    _log("Pass 3 – Caching metadata and Chunk-Encoding text (RAM Safe)...")
+    _log("Pass 3 – Caching metadata and Chunk-Encoding text...")
 
     # 768MB numpy array for raw embeddings, perfectly safe for 16GB RAM
     raw_embs = np.zeros((N_p, 384), dtype=np.float32)
