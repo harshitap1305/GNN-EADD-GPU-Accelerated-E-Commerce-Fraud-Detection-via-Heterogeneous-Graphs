@@ -23,7 +23,7 @@ def clean_price_string(price_str):
 class HeteroDOMINANT(torch.nn.Module):
     def __init__(self, hidden_channels, out_channels):
         super().__init__()
-        # Dual-stage logic: Shared encoder for heterogeneous nodes [cite: 48, 60]
+        # Dual-stage logic: Shared encoder for heterogeneous nodes
         self.encoder = HeteroConv({
             ('buyer', 'reviews', 'product'): SAGEConv((-1, -1), hidden_channels),
             ('seller', 'sells', 'product'): SAGEConv((-1, -1), hidden_channels),
@@ -42,7 +42,7 @@ class HeteroDOMINANT(torch.nn.Module):
         h_dict = self.encoder(x_dict, edge_index_dict)
         h_dict = {k: self.bn_map[k](F.leaky_relu(v)) for k, v in h_dict.items() if k in self.bn_map}
         z_dict = {k: self.proj(v) for k, v in h_dict.items()}
-        # Attribute reconstruction for Stage 1 [cite: 48, 216]
+        # Attribute reconstruction for Stage 1
         x_hat = torch.sigmoid(self.attr_decoder(z_dict['product']))
         return z_dict, x_hat
 
@@ -61,13 +61,13 @@ def run_dominant():
         asin = d.get('asin')
         if not asin: continue
         
-        # Capture 'brand' for Seller nodes [cite: 189]
+        # Capture 'brand' for Seller nodes
         brand = str(d.get('brand', 'Unknown'))
         
         products.append({
             'asin': asin, 
             'price': clean_price_string(d.get('price')),
-            'brand': brand,  # CRITICAL: Included in dict to avoid KeyError
+            'brand': brand,
             'cat_id': hash(str(d.get('categories', [['None']])[0][0])) % 1000
         })
         brand_map[asin] = brand
@@ -88,11 +88,11 @@ def run_dominant():
 
     # HeteroData Construction
     data = HeteroData()
-    scaler = MinMaxScaler() # Normalization as per paper [cite: 201]
+    scaler = MinMaxScaler() # Normalization
     data['product'].x = torch.tensor(scaler.fit_transform(df_p[['price', 'cat_id']].values), dtype=torch.float)
     data['buyer'].x, data['seller'].x = torch.ones((len(buyer_list), 1)), torch.ones((len(brand_to_idx), 1))
     
-    # Define edges for the Trinity [cite: 191]
+    # Define edges
     b_p = torch.tensor([[buyer_to_idx[r[0]], asin_to_idx[r[1]]] for r in reviews], dtype=torch.long).t()
     data['buyer', 'reviews', 'product'].edge_index = b_p
     data['product', 'rev_reviews', 'buyer'].edge_index = b_p[[1, 0]]
@@ -101,7 +101,7 @@ def run_dominant():
     data['seller', 'sells', 'product'].edge_index = s_p
     data['product', 'rev_sells', 'seller'].edge_index = s_p[[1, 0]]
 
-    # Stage 1: Unsupervised Learning [cite: 48, 179]
+    # Stage 1: Unsupervised Learning
     model = HeteroDOMINANT(64, 32).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-5)
     data = data.to(device)
@@ -128,7 +128,7 @@ def run_dominant():
             b_counts[b_idx] += 1
         buyer_scores = buyer_scores / np.maximum(b_counts, 1)
 
-    # REFINED THRESHOLDS: Multipliers adjusted for target counts
+    # Thresholds
    
     thresh_p = np.mean(prod_scores) + 2.2 * np.std(prod_scores)
   
