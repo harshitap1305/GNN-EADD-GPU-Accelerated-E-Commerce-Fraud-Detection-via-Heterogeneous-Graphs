@@ -85,7 +85,7 @@ This `README.md` provides a technical overview of the `dominant.py` script, whic
 
 This script implements a **Heterogeneous Graph Neural Network (GNN)** inspired by the DOMINANT (Deep Anomaly Detection on Attributed Networks) architecture. It identifies anomalies by learning the normal relationships between products, buyers, and sellers, flagging nodes that deviate from these learned patterns.
 
-## ## Algorithm Architecture
+## Algorithm Architecture
 
 The model uses a multi-stage **Deep Autoencoder** specifically designed for heterogeneous graph data.
 
@@ -107,7 +107,7 @@ The script builds a complex graph structure representing the "Trinity" of e-comm
 
 ---
 
-## ## Mathematical Objective
+## Mathematical Objective
 
 The current implementation focuses on **Attribute Reconstruction Error**. The model is trained to minimize the difference between original features ($X$) and reconstructed features ($\hat{X}$):
 
@@ -118,7 +118,7 @@ $$Score = \|X - \hat{X}\|_2$$
 
 ---
 
-## ## Parameter Specifications
+## Parameter Specifications
 
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
@@ -131,7 +131,7 @@ $$Score = \|X - \hat{X}\|_2$$
 
 ---
 
-## ## Scoring & Thresholding Logic
+## Scoring & Thresholding Logic
 
 Once the model is trained, it performs inference to assign anomaly scores to both products and buyers:
 
@@ -145,7 +145,7 @@ Buyer anomalies are derived from their interaction history. A buyer's score is t
 
 ---
 
-## ## Execution Workflow
+## Execution Workflow
 
 1.  **Metadata Ingestion:** Extracts product price, brand (Seller), and category.
 2.  **Interaction Ingestion:** Loads the 5-core review data to establish Buyer-Product links.
@@ -155,7 +155,7 @@ Buyer anomalies are derived from their interaction history. A buyer's score is t
 
 ---
 
-## ## Requirements
+## Requirements
 * `torch` & `torch_geometric`
 * `pandas`, `numpy`
 * `scikit-learn`
