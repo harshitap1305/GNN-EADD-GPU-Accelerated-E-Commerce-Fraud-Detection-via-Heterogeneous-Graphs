@@ -28,7 +28,7 @@ def load_full_data(meta_path, core_path):
             if asin not in asin_map:
                 asin_map[asin] = len(asin_map)
             
-            # Feature extraction (Price and Categories) [cite: 286]
+            # Feature extraction (Price and Categories)
             price = d.get('price', 0)
             cats = d.get('categories', [])
             cat_id = hash(str(cats[0][0])) % 1000 if (cats and cats[0]) else 0
@@ -43,7 +43,7 @@ def load_full_data(meta_path, core_path):
         src_asin = d.get('asin')
         if src_asin in asin_map:
             src_idx = asin_map[src_asin]
-            # Modeling relationships as edges [cite: 98, 275]
+            # Modeling relationships as edges
             related = d.get('also_buy', []) + d.get('also_viewed', [])
             for rel_asin in related:
                 if rel_asin in asin_map:
@@ -75,10 +75,10 @@ def load_full_data(meta_path, core_path):
 class GraphSAGEBaseline(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super().__init__()
-        # SAGEConv aggregates neighbor features [cite: 211, 335]
+        # SAGEConv aggregates neighbor features
         self.conv1 = SAGEConv(in_channels, hidden_channels)
         self.conv2 = SAGEConv(hidden_channels, out_channels)
-        # Linear decoder for unsupervised reconstruction [cite: 353]
+        # Linear decoder for unsupervised reconstruction
         self.decoder = torch.nn.Linear(out_channels, in_channels)
 
     def forward(self, x, edge_index):
@@ -102,7 +102,7 @@ def run_baseline():
     for epoch in range(31):
         optimizer.zero_grad()
         recon = model(data.x, data.edge_index)
-        # Minimizing reconstruction loss [cite: 361]
+        # Minimizing reconstruction loss
         loss = F.mse_loss(recon, data.x)
         loss.backward()
         optimizer.step()
@@ -110,7 +110,7 @@ def run_baseline():
     model.eval()
     with torch.no_grad():
         recon = model(data.x, data.edge_index)
-        # L2 norm for anomaly scoring [cite: 238]
+        # L2 norm for anomaly scoring
         scores = torch.norm(recon - data.x, dim=1).numpy()
 
     # --- TARGETING 4000-5000 ANOMALIES ---
