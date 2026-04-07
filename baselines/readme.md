@@ -77,86 +77,89 @@ This `README.md` provides a technical deep-dive into the `dominant.py` script, w
 
 ---
 
+This `README.md` provides a technical overview of the `dominant.py` script, which implements a **Heterogeneous Deep Anomaly Detection** framework for identifying suspicious products and buyers in e-commerce graphs.
+
+---
+
 # HeteroDOMINANT: Graph-Based Anomaly Detection
 
-This script implements a modified version of the **DOMINANT** (Deep Anomaly Detection on Attributed Networks) algorithm, adapted for **Heterogeneous Graphs**. It identifies anomalous products and buyers by looking for deviations in both their attributes (price, category) and their structural relationships (who buys what).
+This script implements a **Heterogeneous Graph Neural Network (GNN)** inspired by the DOMINANT (Deep Anomaly Detection on Attributed Networks) architecture. It identifies anomalies by learning the normal relationships between products, buyers, and sellers, flagging nodes that deviate from these learned patterns.
 
-## Algorithm Architecture
+## ## Algorithm Architecture
 
-The model uses a **Deep Autoencoder** architecture designed for graph-structured data. It consists of two primary components working in tandem:
+The model uses a multi-stage **Deep Autoencoder** specifically designed for heterogeneous graph data.
 
-### 1. Heterogeneous GNN Encoder
-The encoder uses `HeteroConv` with `SAGEConv` operators to aggregate information across different node types:
-* **Node Types:** `Buyer`, `Product`, and `Seller`.
-* **Relationships:** * `(Buyer) -> reviews -> (Product)`
-    * `(Seller) -> sells -> (Product)`
-* **Information Flow:** The model performs message passing between these nodes to create a latent representation (embedding) that captures the context of every interaction.
+### 1. Heterogeneous Graph Construction
+The script builds a complex graph structure representing the "Trinity" of e-commerce interactions:
+* **Nodes:**
+    * **Product:** Features include normalized price and category hash.
+    * **Buyer:** Nodes derived from the 5-core interaction dataset.
+    * **Seller:** Nodes derived from the 'brand' metadata.
+* **Edges:**
+    * `('buyer', 'reviews', 'product')`
+    * `('seller', 'sells', 'product')`
+    * Inverse edges are automatically created to allow bidirectional information flow during message passing.
 
-
-### 2. Multi-Objective Decoder
-The model is trained to minimize two distinct types of errors:
-* **Attribute Reconstruction Error ($R_a$):** A MLP decoder attempts to reconstruct the original product features (Price and Category) from the latent embeddings. Anomalous products are those whose attributes cannot be easily reconstructed.
-* **Structural Reconstruction Error ($R_s$):** The model uses a Link Prediction objective. It learns to give high scores to existing edges (real reviews) and low scores to random pairs. Anomalous nodes are those that form "illegal" or highly improbable connections.
-
----
-
-## Mathematical Objective
-
-The total loss function is a weighted combination of Attribute and Structural loss:
-
-$$Loss = \alpha \cdot \text{MSE}(X, \hat{X}) + (1 - \alpha) \cdot \text{BCE}(S, \hat{S})$$
-
-Where:
-* **$\alpha$:** Balancing hyperparameter.
-* **$\text{MSE}$:** Mean Squared Error for product attributes.
-* **$\text{BCE}$:** Binary Cross Entropy for graph structure (link prediction).
+### 2. Encoder-Decoder Mechanism
+* **Hetero-Encoder:** Uses `HeteroConv` with `SAGEConv` operators to aggregate neighborhood information across different node and edge types.
+* **Shared Latent Space:** Maps high-dimensional neighborhood data into a 32-dimensional embedding [z].
+* **Attribute Decoder:** A linear layer that attempts to reconstruct the original product attributes (Price and Category).
 
 ---
 
-## Parameter Specifications
+## ## Mathematical Objective
+
+The current implementation focuses on **Attribute Reconstruction Error**. The model is trained to minimize the difference between original features ($X$) and reconstructed features ($\hat{X}$):
+
+$$Loss = \text{MSE}(X_{product}, \hat{X}_{product})$$
+
+Anomalies are defined as nodes with a high **Reconstruction Score**, calculated using the $L_2$ norm:
+$$Score = \|X - \hat{X}\|_2$$
+
+---
+
+## ## Parameter Specifications
 
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
-| `hidden_channels` | 64 | Dimensionality of the hidden layers in the GNN. |
-| `out_channels` | 32 | Dimensionality of the final latent embedding (z). |
-| `alpha` ($\alpha$) | 0.8 | Weighting factor; 0.8 puts a high priority on attribute stability. |
-| `learning_rate` | 0.0005 | Slower rate for stable convergence in heterogeneous spaces. |
-| `epochs` | 251 | Number of training iterations. |
+| `hidden_channels` | 64 | Dimensionality of the internal GNN hidden layers. |
+| `out_channels` | 32 | Size of the latent embedding used for reconstruction. |
+| `learning_rate` | 0.0005 | Learning rate for the Adam optimizer. |
 | `weight_decay` | 1e-5 | L2 regularization to prevent overfitting to common patterns. |
-| `n_sample` | 2048 | Number of edges sampled per batch for structural loss calculation. |
+| `epochs` | 251 | Number of training iterations for convergence. |
+| `seed` | 42 | Fixed random seed for reproducibility. |
 
 ---
 
-## Anomaly Scoring Logic
+## ## Scoring & Thresholding Logic
 
-After training, anomalies are detected using a **Z-Score thresholding** method:
+Once the model is trained, it performs inference to assign anomaly scores to both products and buyers:
 
-1.  **Product Score:** Calculated as the Euclidean norm of the reconstruction error: $\|X - \hat{X}\|$.
-2.  **Buyer Score:** Calculated as the average anomaly score of all products the buyer has reviewed.
-3.  **Thresholding:**
-    * **Products:** Nodes with a score $> \text{mean} + 2.5 \sigma$ are flagged.
-    * **Buyers:** Nodes with a score $> \text{mean} + 3.0 \sigma$ are flagged.
+### Product Scoring
+Products are scored based on how poorly the model can reconstruct their price and category given their structural context.
+* **Threshold:** $Mean + 2.2 \times \sigma$ (Standard Deviation).
 
----
-
-## Data Pipeline
-
-1.  **Preprocessing:** * Prices are extracted from strings using Regex and normalized.
-    * Categories are hashed into numerical buckets.
-    * Product features are scaled using `MinMaxScaler` to a range of $[0, 1]$.
-2.  **Graph Construction:** * Builds a `HeteroData` object with bidirectional edges (e.g., `reviews` and `rev_reviews`) to allow information to flow in both directions during training.
-3.  **Execution:**
-    * The model runs on CUDA (GPU) if available.
-    * Includes a fixed seed (`42`) to ensure that results are reproducible across different runs.
+### Buyer Scoring
+Buyer anomalies are derived from their interaction history. A buyer's score is the **average anomaly score** of all products they have reviewed.
+* **Threshold:** $Mean + 4.0 \times \sigma$ (Standard Deviation).
 
 ---
 
-## Outputs
+## ## Execution Workflow
 
-* `dominant_anomalies_metadata.csv`: Ranked list of products with high attribute/structural deviation.
-* `dominant_anomalies_5core_buyers.csv`: List of buyers flagged for interacting with anomalous products.
-* `dominant_anomalous_asins_metadata.txt`: Raw IDs (ASINs) of flagged products.
-* `dominant_anomalous_asins_5core.txt`: ASINs targeted by anomalous buyers.
+1.  **Metadata Ingestion:** Extracts product price, brand (Seller), and category.
+2.  **Interaction Ingestion:** Loads the 5-core review data to establish Buyer-Product links.
+3.  **Normalization:** Scales product features using `MinMaxScaler` to a range of $[0, 1]$.
+4.  **Unsupervised Training:** The model iterates 251 times to minimize reconstruction loss.
+5.  **Anomalous Extraction:** Identifies and prints the total count of outlier products and buyers based on refined statistical thresholds.
+
+---
+
+## ## Requirements
+* `torch` & `torch_geometric`
+* `pandas`, `numpy`
+* `scikit-learn`
+* `tqdm`
 
   <img width="696" height="316" alt="image" src="https://github.com/user-attachments/assets/2af97f89-e7bb-4e20-87b1-c33e8b6879b6" />
 
