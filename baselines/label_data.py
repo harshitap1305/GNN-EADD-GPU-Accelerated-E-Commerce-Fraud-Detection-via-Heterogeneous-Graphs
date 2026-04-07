@@ -109,19 +109,33 @@ def run_pipeline(review_path, meta_path):
         (df_users['reviewerID'].isin(burst_users))
     ).astype(np.uint8)
 
-    # --- PHASE 6: EXPORT ---
-    print("\nStep 6/6: Saving Binary and Verification Outputs...")
-    np.save('product_labels.npy', df_meta['is_anomaly'].values)
-    np.save('user_labels.npy', df_users['is_anomaly'].values)
+    # --- PHASE 6: EXPORT (Updated for specific filenames and formats) ---
+    print("\nStep 6/6: Saving Specific Output Files...")
     
-    df_meta[['asin', 'is_anomaly', 'core_num', 'avg_rating']].to_csv('verified_products.csv', index=False)
-    df_users[['reviewerID', 'is_anomaly', 'core_num']].to_csv('verified_users.csv', index=False)
+    # 1. CSV files for both datasets (All details for anomalous nodes only)
+    df_meta[df_meta['is_anomaly'] == 1].to_csv('labelling_meta.csv', index=False)
+    df_users[df_users['is_anomaly'] == 1].to_csv('labelling_5core.csv', index=False)
+    
+    # 2. TXT files containing only the IDs (ASIN/ReviewerID) of anomalous nodes
+    # For meta dataset
+    anom_asins = df_meta[df_meta['is_anomaly'] == 1]['asin'].astype(str)
+    with open('labelling_asin_meta.txt', 'w') as f:
+        f.write('\n'.join(anom_asins))
+        
+    # For 5-core review dataset
+    anom_users = df_users[df_users['is_anomaly'] == 1]['reviewerID'].astype(str)
+    with open('labelling_asin_5_core.txt', 'w') as f:
+        f.write('\n'.join(anom_users))
     
     print("-" * 30)
-    print(f"Product Label Count: {df_meta['is_anomaly'].sum()}")
-    print(f"User Label Count:    {df_users['is_anomaly'].sum()}")
+    print(f"Anomalous Products found: {len(anom_asins)}")
+    print(f"Anomalous Users found:    {len(anom_users)}")
     print("-" * 30)
-    print("Success! Files saved for GNN-EADD training.")
+    print("Files created successfully:")
+    print("- labelling_meta.csv")
+    print("- labelling_5core.csv")
+    print("- labelling_asin_meta.txt")
+    print("- labelling_asin_5_core.txt")
 
 if __name__ == "__main__":
     run_pipeline('Electronics_5.json.gz', 'meta_Electronics.json.gz')
