@@ -6,7 +6,7 @@ This `README.md` provides a comprehensive technical overview of the `label_data.
 
 This script implements a multi-phase data processing pipeline to identify potentially fraudulent products, suspicious sellers, and anomalous user behavior. It combines traditional data filtering with **Graph Theory** (K-Core decomposition) to find dense subgraphs of suspicious activity.
 
-## ## Algorithm Overview
+## Algorithm Overview
 
 The detection logic is split into two primary entities: **Products** (Metadata) and **Users** (Reviews).
 
@@ -33,7 +33,7 @@ A user is flagged if they exhibit **both** high connectivity and temporal synchr
 
 ---
 
-## ## Parameter Reference
+## Parameter Reference
 
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
@@ -46,7 +46,7 @@ A user is flagged if they exhibit **both** high connectivity and temporal synchr
 
 ---
 
-## ## Pipeline Phases
+## Pipeline Phases
 
 1.  **Metadata Ingestion:** Loads JSON metadata, extracts categories, and cleans price strings into numeric floats.
 2.  **Review Ingestion:** Loads interaction data (Reviewer ID, ASIN, Rating, Timestamps).
@@ -57,16 +57,17 @@ A user is flagged if they exhibit **both** high connectivity and temporal synchr
 
 ---
 
-## ## Output Files
+## Output Files
 
 * `labelling_meta.csv`: Detailed metadata for products flagged as anomalies.
 * `labelling_5core.csv`: List of users flagged for high-density synchronized behavior.
 * `labelling_asin_meta.txt`: A simple list of ASINs flagged via product heuristics.
 * `labelling_asin_5_core.txt`: ASINs associated with the flagged anomalous users (used to identify "Targeted" products).
+<img width="719" height="418" alt="image" src="https://github.com/user-attachments/assets/732b79c3-10bf-4277-a85f-dee03edcfe21" />
 
 ---
 
-## ## Requirements
+## Requirements
 * `pandas`, `numpy`
 * `networkx` (for Graph algorithms)
 * `tqdm` (for progress tracking)
@@ -80,7 +81,7 @@ This `README.md` provides a technical deep-dive into the `dominant.py` script, w
 
 This script implements a modified version of the **DOMINANT** (Deep Anomaly Detection on Attributed Networks) algorithm, adapted for **Heterogeneous Graphs**. It identifies anomalous products and buyers by looking for deviations in both their attributes (price, category) and their structural relationships (who buys what).
 
-## ## Algorithm Architecture
+## Algorithm Architecture
 
 The model uses a **Deep Autoencoder** architecture designed for graph-structured data. It consists of two primary components working in tandem:
 
@@ -99,7 +100,7 @@ The model is trained to minimize two distinct types of errors:
 
 ---
 
-## ## Mathematical Objective
+## Mathematical Objective
 
 The total loss function is a weighted combination of Attribute and Structural loss:
 
@@ -112,7 +113,7 @@ Where:
 
 ---
 
-## ## Parameter Specifications
+## Parameter Specifications
 
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
@@ -126,7 +127,7 @@ Where:
 
 ---
 
-## ## Anomaly Scoring Logic
+## Anomaly Scoring Logic
 
 After training, anomalies are detected using a **Z-Score thresholding** method:
 
@@ -138,7 +139,7 @@ After training, anomalies are detected using a **Z-Score thresholding** method:
 
 ---
 
-## ## Data Pipeline
+## Data Pipeline
 
 1.  **Preprocessing:** * Prices are extracted from strings using Regex and normalized.
     * Categories are hashed into numerical buckets.
@@ -150,12 +151,15 @@ After training, anomalies are detected using a **Z-Score thresholding** method:
 
 ---
 
-## ## Outputs
+## Outputs
 
 * `dominant_anomalies_metadata.csv`: Ranked list of products with high attribute/structural deviation.
 * `dominant_anomalies_5core_buyers.csv`: List of buyers flagged for interacting with anomalous products.
 * `dominant_anomalous_asins_metadata.txt`: Raw IDs (ASINs) of flagged products.
 * `dominant_anomalous_asins_5core.txt`: ASINs targeted by anomalous buyers.
+
+  <img width="696" height="316" alt="image" src="https://github.com/user-attachments/assets/2af97f89-e7bb-4e20-87b1-c33e8b6879b6" />
+
 
 This `README.md` provides a technical breakdown of the `sage_anomaly.py` script, which implements an **Unsupervised GraphSAGE Autoencoder** for identifying anomalous products and interactions in e-commerce graph data.
 
@@ -165,7 +169,7 @@ This `README.md` provides a technical breakdown of the `sage_anomaly.py` script,
 
 This repository contains an implementation of a structural anomaly detection system using **GraphSAGE** (SAGEPool/Graph Sample and Aggregate). Unlike standard heuristic models, this algorithm learns the "normal" structural and feature-based patterns of a product network and flags items that deviate significantly from these learned representations.
 
-## ## Algorithm Architecture
+## Algorithm Architecture
 
 The system uses an **Encoder-Decoder** architecture built on Graph Neural Networks (GNNs).
 
@@ -188,7 +192,7 @@ The decoder is a linear layer that attempts to map the latent embeddings back to
 
 ---
 
-## ## Parameter Specifications
+## Parameter Specifications
 
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
@@ -202,7 +206,7 @@ The decoder is a linear layer that attempts to map the latent embeddings back to
 
 ---
 
-## ## Execution Workflow
+## Execution Workflow
 
 1.  **Data Streaming:** Parses large `.json.gz` metadata files using a generator to minimize memory footprint.
 2.  **Feature Scaling:** Applies `StandardScaler` to ensure price and category IDs are on a comparable scale for the GNN.
@@ -212,7 +216,7 @@ The decoder is a linear layer that attempts to map the latent embeddings back to
 
 ---
 
-## ## Output Files
+## Output Files
 
 The script generates four distinct output files to separate raw product anomalies from those that also appear in the interaction (5-core) dataset:
 
@@ -220,10 +224,11 @@ The script generates four distinct output files to separate raw product anomalie
 * **`SAGE_meta_asins.txt`**: A simple list of ASINs for the flagged products.
 * **`SAGE_five_core_anomalies.csv`**: A subset of anomalies that are present in the `Electronics_5.json.gz` interaction file.
 * **`SAGE_five_core_asins.txt`**: A simple list of ASINs for the interaction-based anomalies.
+<img width="718" height="401" alt="image" src="https://github.com/user-attachments/assets/f9ccafa1-c4d9-4a08-b5e4-83e6a66e3193" />
 
 ---
 
-## ## Requirements
+## Requirements
 * `torch` & `torch_geometric` (PyG)
 * `pandas` & `numpy`
 * `scikit-learn` (for Scaling)
