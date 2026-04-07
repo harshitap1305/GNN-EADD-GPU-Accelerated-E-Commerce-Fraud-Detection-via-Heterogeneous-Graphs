@@ -66,7 +66,6 @@ def run_pipeline(review_path, meta_path):
     v_ratio = df_rev.groupby('asin')['verified'].mean()
     df_meta['verified_ratio'] = df_meta['asin'].map(v_ratio).fillna(1.0)
 
-    # FIX: Create the mismatch column BEFORE using it in the flag logic
     df_meta['brand_mismatch'] = df_meta.apply(
         lambda x: x['brand'].lower() not in x['title'].lower() if x['brand'] != 'Unknown' else False, axis=1
     )
@@ -97,7 +96,6 @@ def run_pipeline(review_path, meta_path):
     df_users['core_num'] = df_users['reviewerID'].map(core_map).fillna(0)
     
     # Goal: Synchronized unixReviewTime bursts (> 35 reviews at same second)
-    # Stricter threshold to pull count toward 5000
     burst_users = df_rev.groupby(['reviewerID', 'unixReviewTime']).filter(lambda x: len(x) > 35)['reviewerID'].unique()
     
     # Goal: is_kcore_anomaly - Target top 0.6% (1 - 0.994)
@@ -109,10 +107,10 @@ def run_pipeline(review_path, meta_path):
         (df_users['reviewerID'].isin(burst_users))
     ).astype(np.uint8)
 
-    # --- PHASE 6: EXPORT (Updated for specific filenames and formats) ---
+    # --- PHASE 6: EXPORT ---
     print("\nStep 6/6: Saving Specific Output Files...")
     
-    # 1. CSV files for both datasets (All details for anomalous nodes only)
+    # 1. CSV files for both datasets
     df_meta[df_meta['is_anomaly'] == 1].to_csv('labelling_meta.csv', index=False)
     df_users[df_users['is_anomaly'] == 1].to_csv('labelling_5core.csv', index=False)
     
