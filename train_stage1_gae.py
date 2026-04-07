@@ -9,12 +9,10 @@ import numpy as np
 import json
 import time
 
-# Import our custom CUDA kernel!
+# Import our custom CUDA kernel
 import custom_spmm 
 
-# ---------------------------------------------------------
 # AUTOGRAD WRAPPERS: Bridging Custom C++ and PyTorch Gradients
-# ---------------------------------------------------------
 class SpMM_Autograd(torch.autograd.Function):
     @staticmethod
     def forward(ctx, rp, ci, edge_weights, X):
@@ -54,9 +52,7 @@ class SpMM_Autograd(torch.autograd.Function):
             
         return None, None, None, grad_X_fp32.to(ctx.x_dtype)
 
-# ---------------------------------------------------------
 # 1. Memory-Mapped DataLoader & Normalization
-# ---------------------------------------------------------
 def compute_symmetric_edge_weights(rp, ci, global_deg, src_offset):
     """Computes exact GCN symmetric normalization mapping directly via Global IDs"""
     row_lengths = rp[1:] - rp[:-1]
@@ -120,9 +116,7 @@ def load_graph_data():
            eps_rp, eps_ci, eps_w, eps_T_rp, eps_T_ci, eps_T_w, \
            euu_rp, euu_ci, euu_w
 
-# ---------------------------------------------------------
 # 2. Triple-Stream GAE Architecture (2-Layer, 128-D)
-# ---------------------------------------------------------
 class TripleStreamGAE(nn.Module):
     def __init__(self, in_dim=128, hidden_dim=128, out_dim=128, N_u=0, N_p=0):
         super().__init__()
@@ -215,9 +209,8 @@ class TripleStreamGAE(nn.Module):
         Z = self._forward_layer(H1, *args, layer=2)
         return Z
 
-# ---------------------------------------------------------
+
 # 3. Dynamic CSR Edge Sampler (Fixed: No Self-Loops)
-# ---------------------------------------------------------
 def sample_positive_edges(rp, ci, src_offset, num_samples):
     row_lengths = rp[1:] - rp[:-1]
     src = torch.repeat_interleave(torch.arange(len(rp)-1, device=rp.device), row_lengths) + src_offset
@@ -233,9 +226,7 @@ def sample_positive_edges(rp, ci, src_offset, num_samples):
     idx = torch.randint(0, len(src), (min(num_samples, len(src)),), device=rp.device)
     return src[idx].long(), dst[idx].long()
 
-# ---------------------------------------------------------
 # 4. Fast Edge Reconstruction & Training
-# ---------------------------------------------------------
 def train_gae():
     X, N_u, N_p, N_s, num_nodes, \
     epu_rp, epu_ci, epu_w, epu_T_rp, epu_T_ci, epu_T_w, \
@@ -259,7 +250,6 @@ def train_gae():
                          eps_rp, eps_ci, eps_w, eps_T_rp, eps_T_ci, eps_T_w, 
                          euu_rp, euu_ci, euu_w)
 
-        # FIX: Pull the Dot Product Decoder OUT of Mixed Precision.
         # Forces the dot product to compute in FP32, making it impossible to overflow!
         Z = Z.float()
 
