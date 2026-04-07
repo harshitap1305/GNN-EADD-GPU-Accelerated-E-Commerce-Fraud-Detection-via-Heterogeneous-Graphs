@@ -54,8 +54,8 @@ def run_pipeline(review_path, meta_path):
     
     # Map core numbers back to dataframes
     df_meta['core_num'] = df_meta['asin'].map(core_map).fillna(0)
-    
-   # --- PHASE 4: PRODUCT ANOMALIES (Unified Goal Flagging) ---
+
+    # --- PHASE 4: PRODUCT ANOMALIES (Unified Goal Flagging) ---
     print("\nStep 4/6: Flagging Outlier Products...")
     
     # 1. Prepare attributes for Goal Summary
@@ -63,29 +63,32 @@ def run_pipeline(review_path, meta_path):
     ratings = df_rev.groupby('asin')['overall'].mean()
     df_meta['avg_rating'] = df_meta['asin'].map(ratings).fillna(0)
     
-    # verified_ratio for "is_fake_seller" goal
     v_ratio = df_rev.groupby('asin')['verified'].mean()
     df_meta['verified_ratio'] = df_meta['asin'].map(v_ratio).fillna(1.0)
+
+    # FIX: Create the mismatch column BEFORE using it in the flag logic
+    df_meta['brand_mismatch'] = df_meta.apply(
+        lambda x: x['brand'].lower() not in x['title'].lower() if x['brand'] != 'Unknown' else False, axis=1
+    )
     
-    # 2. Define Goal Flags
-    # Goal: is_fake_product (High rating + Low price + Brand/Title mismatch)
+    # 2. Define Goal Flags with Tuned Thresholds for 4000-5000 range
+    # Target top 0.6% structurally
+    k_limit_p = df_meta['core_num'].quantile(0.994)
+    
     df_meta['is_fake_product'] = (
-        (df_meta['avg_rating'] >= 4.5) & 
-        (df_meta['price'] < 0.2 * medians) & 
+        (df_meta['avg_rating'] >= 4.8) & 
+        (df_meta['price'] < 0.15 * medians) & 
         (df_meta['brand_mismatch'] == True)
     ).astype(int)
 
-    # Goal: is_fake_seller (High volume in also_buy + Low verified ratio)
     df_meta['is_fake_seller'] = (
-        (df_meta['also_buy_count'] > 50) & 
-        (df_meta['verified_ratio'] < 0.3)
+        (df_meta['also_buy_count'] > 80) & 
+        (df_meta['verified_ratio'] < 0.25)
     ).astype(int)
 
-    # Goal: is_kcore_anomaly (Maximal K-core) - Targeted at top 0.6%
-    k_limit_p = df_meta['core_num'].quantile(0.994)
     df_meta['is_kcore_anomaly'] = (df_meta['core_num'] >= k_limit_p).astype(int)
 
-    # UNIFIED PRODUCT FLAG (OR Logic)
+    # UNIFIED PRODUCT FLAG
     df_meta['is_anomaly'] = df_meta[['is_fake_product', 'is_fake_seller', 'is_kcore_anomaly']].max(axis=1).astype(np.uint8)
 
     # --- PHASE 5: USER ANOMALIES (Unified Goal Flagging) ---
@@ -93,10 +96,11 @@ def run_pipeline(review_path, meta_path):
     df_users = pd.DataFrame({'reviewerID': df_rev['reviewerID'].unique()})
     df_users['core_num'] = df_users['reviewerID'].map(core_map).fillna(0)
     
-    # Goal: Synchronized unixReviewTime bursts (> 20 reviews at same second)
-    burst_users = df_rev.groupby(['reviewerID', 'unixReviewTime']).filter(lambda x: len(x) > 20)['reviewerID'].unique()
+    # Goal: Synchronized unixReviewTime bursts (> 35 reviews at same second)
+    # Stricter threshold to pull count toward 5000
+    burst_users = df_rev.groupby(['reviewerID', 'unixReviewTime']).filter(lambda x: len(x) > 35)['reviewerID'].unique()
     
-    # Goal: is_kcore_anomaly (Maximal K-core) - Targeted at top 0.6%
+    # Goal: is_kcore_anomaly - Target top 0.6% (1 - 0.994)
     k_limit_u = df_users['core_num'].quantile(0.994)
     
     # UNIFIED USER FLAG
@@ -110,7 +114,6 @@ def run_pipeline(review_path, meta_path):
     np.save('product_labels.npy', df_meta['is_anomaly'].values)
     np.save('user_labels.npy', df_users['is_anomaly'].values)
     
-    # Final CSVs for the terminal inspector
     df_meta[['asin', 'is_anomaly', 'core_num', 'avg_rating']].to_csv('verified_products.csv', index=False)
     df_users[['reviewerID', 'is_anomaly', 'core_num']].to_csv('verified_users.csv', index=False)
     
