@@ -2,15 +2,13 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
-// This is new code changed
-// =========================================================
+
 // 1. Warp-Aligned CSR Sparse Matrix Multiplication (Encoder)
-// Fixed: Accepts dynamic dimensions and pre-computed edge_weights
-// =========================================================
+
 __global__ void csr_spmm_warp_kernel(
     const int* __restrict__ row_ptr,
     const int* __restrict__ col_idx,
-    const float* __restrict__ edge_weights, // NEW: Supports symmetric GCN normalization
+    const float* __restrict__ edge_weights, 
     const half* __restrict__ in_features,
     float* __restrict__ out_features,
     int num_nodes,
@@ -24,7 +22,7 @@ __global__ void csr_spmm_warp_kernel(
         int row_start = row_ptr[warp_id];
         int row_end = row_ptr[warp_id + 1];
         
-        // FIX: Dynamic dimensions. Supports up to 1024-D features
+        //  Dynamic dimensions. Supports up to 1024-D features
         const int MAX_CHUNKS = 32;
         float acc[MAX_CHUNKS];
         int num_chunks = (dim + 31) / 32;
@@ -77,10 +75,7 @@ torch::Tensor spmm_cuda(torch::Tensor row_ptr, torch::Tensor col_idx, torch::Ten
     return out_features;
 }
 
-// =========================================================
 // 2. Warp-Aligned Sparse Dot Product (Decoder)
-// Fixed: Accepts dynamic dimensions
-// =========================================================
 __global__ void warp_sparse_dot_product_kernel(
     const float* __restrict__ Z,
     const int* __restrict__ src_idx,
@@ -99,7 +94,7 @@ __global__ void warp_sparse_dot_product_kernel(
         float acc = 0.0f;
         int num_chunks = (dim + 31) / 32;
         
-        // FIX: Dynamic Dimension support instead of hardcoded 4 loops
+        // Dynamic Dimension support
         #pragma unroll 4
         for(int c = 0; c < num_chunks; ++c) {
             int col = lane_id + c * 32;
