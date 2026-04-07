@@ -42,3 +42,5 @@ python train_stage1_gae.py
 ### Output:
 - Saves the computed 128-D latent embeddings to `Z_embeddings_stage1.npy`.
 - These embeddings are consumed by Stage 2 (Semi-supervised GAT specific for anomaly detection).
+<img width="1056" height="686" alt="Screenshot from 2026-04-07 17-36-37" src="https://github.com/user-attachments/assets/346f4d06-73cd-4ef4-8572-a82df456c24b" />
+
