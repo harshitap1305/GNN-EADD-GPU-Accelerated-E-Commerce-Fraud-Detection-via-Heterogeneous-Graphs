@@ -1,0 +1,14 @@
+# Install torch FIRST (outside requirements.txt, because index URL varies by CUDA):
+# pip install torch --index-url https://download.pytorch.org/whl/cu118   # CUDA 11.8 (RTX 3060/4060 minimum)
+# pip install torch --index-url https://download.pytorch.org/whl/cu121   # CUDA 12.1 (recommended)
+#
+# Then install everything else:
+torch-geometric
+numpy>=2.0
+pandas
+scikit-learn
+sentence-transformers
+nltk
+networkx
+tqdm
+setuptools
