@@ -250,20 +250,26 @@ def supervised_loss(logits, labeled_idx, labeled_y):
     return F.binary_cross_entropy_with_logits(logits_labeled, labeled_y)
 
 def unsupervised_loss(logits, epu_rp, epu_ci, eps_rp, eps_ci, euu_rp, euu_ci, N_u, num_samples=5000):
-    total_loss = torch.tensor(0.0, device=logits.device)
-
+    # BUG FIX: Apply sigmoid to convert raw logits into bounded anomaly scores (s_i).
+    # Equation 17 requires the difference between scores (0 to 1), not unbounded logits.
+    scores = torch.sigmoid(logits)
+    
     def edge_loss(rp, ci, src_offset):
         row_lengths = rp[1:] - rp[:-1]
         src = torch.repeat_interleave(torch.arange(len(rp) - 1, device=rp.device), row_lengths) + src_offset
         dst = ci.long()
-        if len(src) == 0: return torch.tensor(0.0, device=logits.device)
+        if len(src) == 0: return torch.tensor(0.0, device=scores.device)
+        
         idx = torch.randint(0, len(src), (min(num_samples, len(src)),), device=rp.device)
-        diff = logits[src[idx]] - logits[dst[idx]]
+        
+        # Calculate the squared difference using the sigmoid scores
+        diff = scores[src[idx]] - scores[dst[idx]]
         return (diff ** 2).mean()
 
     total_loss = (edge_loss(epu_rp, epu_ci, src_offset=0)
                + edge_loss(eps_rp, eps_ci, src_offset=N_u)
                + edge_loss(euu_rp, euu_ci, src_offset=0))
+               
     return total_loss / 3.0
 
 def split_labels(labeled_idx, labeled_y, train_ratio=0.6, val_ratio=0.2, seed=42):
