@@ -95,17 +95,27 @@ def run_pipeline(review_path, meta_path):
     df_users = pd.DataFrame({'reviewerID': df_rev['reviewerID'].unique()})
     df_users['core_num'] = df_users['reviewerID'].map(core_map).fillna(0)
     
+    v_ratio_user = df_rev.groupby('reviewerID')['verified'].mean()
+    df_users['verified_ratio'] = df_users['reviewerID'].map(v_ratio_user).fillna(1.0)
+    
     # Goal: Synchronized unixReviewTime bursts (> 35 reviews at same second)
     burst_users = df_rev.groupby(['reviewerID', 'unixReviewTime']).filter(lambda x: len(x) > 35)['reviewerID'].unique()
     
     # Goal: is_kcore_anomaly - Target top 0.6% (1 - 0.994)
     k_limit_u = df_users['core_num'].quantile(0.994)
     
-    # UNIFIED USER FLAG
-    df_users['is_anomaly'] = (
-        (df_users['core_num'] >= k_limit_u) | 
-        (df_users['reviewerID'].isin(burst_users))
-    ).astype(np.uint8)
+    # PROFILE 1: The Collusive Shill
+    # They are structurally dense (high K-Core) AND their reviews are mostly unverified.
+    # This protects normal "Power Users" (who have high K-Core but high verified ratios).
+    is_collusive_shill = (df_users['core_num'] >= k_limit_u) & (df_users['verified_ratio'] < 0.20)
+    
+    # PROFILE 2: The Spambot
+    # They post an impossible number of reviews at the exact same second. 
+    # Even if they don't have a high K-core yet, this is physically impossible for a human.
+    is_spambot = df_users['reviewerID'].isin(burst_users)
+    
+    # UNIFIED USER FLAG (Flag if they match EITHER fraud profile)
+    df_users['is_anomaly'] = (is_collusive_shill | is_spambot).astype(np.uint8)
 
     # --- PHASE 6: EXPORT ---
     print("\nStep 6/6: Saving Specific Output Files...")
