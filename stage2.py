@@ -10,7 +10,7 @@ import time
 from torch.utils.checkpoint import checkpoint
 import gc
 
-# IMPORT YOUR CUSTOM CUDA EXTENSION
+# Import custom CUDA kernel for optimized operations
 import warp_gat 
 
 # ---------------------------------------------------------
@@ -28,20 +28,21 @@ def load_graph_data_stage2():
 
     def load_and_sanitize_csr(prefix, valid_min, valid_max):
         """
-        Loads the CSR arrays and strips out toxic self-loops injected by Stage 1 
-        that violate the bipartite graph boundaries of Stage 2.
+        Loads the CSR (Compressed Sparse Row) arrays and filters extraneous 
+        self-loops introduced during Stage 1 to maintain strict bipartite 
+        graph constraints for Stage 2 processing.
         """
         rp = torch.from_numpy(np.fromfile(f"data/{prefix}_row_ptr.bin", dtype=np.int32))
         ci = torch.from_numpy(np.fromfile(f"data/{prefix}_col_idx.bin", dtype=np.int32))
         
-        # Identify edges that correctly belong to the target node type
+        # Identify edges corresponding to the target node type
         mask = (ci >= valid_min) & (ci <= valid_max)
         
         if not mask.all():
-            # Filter out invalid edges (like cross-type self loops)
+            # Filter invalid edges to enforce structural constraints
             clean_ci = ci[mask]
             
-            # Reconstruct the row_ptr array to account for the deleted edges
+            # Reconstruct the row pointer array to reflect filtered edges
             row_lengths = rp[1:] - rp[:-1]
             row_indices = torch.repeat_interleave(torch.arange(len(rp) - 1), row_lengths)
             valid_rows = row_indices[mask]
@@ -54,7 +55,7 @@ def load_graph_data_stage2():
             
         return rp, ci 
 
-    # Strictly enforce boundaries: Users (0 to N_u-1), Products (N_u to N_u+N_p-1), Sellers (N_u+N_p to End)
+    # Define node index boundaries: Users (0 to N_u-1), Products (N_u to N_u+N_p-1), Sellers (N_u+N_p to num_nodes-1)
     epu_rp, epu_ci     = load_and_sanitize_csr('epu',   valid_min=N_u,         valid_max=N_u + N_p - 1)
     epu_T_rp, epu_T_ci = load_and_sanitize_csr('epu_T', valid_min=0,           valid_max=N_u - 1)
     eps_rp, eps_ci     = load_and_sanitize_csr('eps',   valid_min=N_u + N_p,   valid_max=num_nodes - 1)
@@ -82,6 +83,7 @@ def load_graph_data_stage2():
 # 2. Hybrid Type-Specific GAT Layer (CUDA + Native)
 # ---------------------------------------------------------
 class TypeSpecificGATLayer(nn.Module):
+
     def __init__(self, in_dim=128, out_dim=128, leaky_slope=0.2):
         super().__init__()
         self.leaky_slope = leaky_slope
@@ -102,10 +104,9 @@ class TypeSpecificGATLayer(nn.Module):
         nn.init.xavier_normal_(self.a_uu.unsqueeze(0))
 
     @staticmethod
-    def _native_sparse_agg(row_ptr, col_idx, H_src_local, H_dst_local, a_vec, leaky_slope, src_offset, is_training, chunk_size=2500):
+    def _native_sparse_agg(row_ptr, col_idx, H_src_local, H_dst_local, a_vec, leaky_slope, src_offset, is_training, chunk_size=2500): # chunk_size tuned empirically to prevent Out-Of-Memory (OOM) errors on 11GB VRAM GPUs
         """
-        Micro-chunked Message-Passing with Aggressive DropEdge and Intra-Loop GC.
-        Engineered specifically to survive the 11GB VRAM ceiling.
+        Memory-efficient micro-chunked message passing utilizing stochastic edge dropping (DropEdge) and explicit intra-loop memory deallocation to optimize VRAM utilization.
         """
         with torch.amp.autocast('cuda', enabled=False): 
             a = a_vec.float() 
@@ -116,7 +117,7 @@ class TypeSpecificGATLayer(nn.Module):
            
             chunks = [] 
            
-            # FIX 1: Micro-chunking down to 2500 nodes to avoid super-node spikes
+            # Partition target nodes into micro-chunks to mitigate memory consumption spikes
             for start in range(0, N_dst, chunk_size):
                 end = min(start + chunk_size, N_dst)
                 edge_start = row_ptr[start].item()
@@ -130,9 +131,9 @@ class TypeSpecificGATLayer(nn.Module):
                 r_indices = torch.repeat_interleave(torch.arange(end - start, device=row_ptr.device), r_lengths)
                 c_indices = col_idx[edge_start:edge_end].long() - src_offset
                
-                # FIX 2: Aggressive DropEdge. Dropping 85% prevents over-smoothing and saves massive VRAM.
+                # Apply DropEdge regularization during training to mitigate over-smoothing and reduce memory footprint
                 if is_training:
-                    keep_mask = torch.rand(len(r_indices), device=r_indices.device) > 0.85
+                    keep_mask = torch.rand(len(r_indices), device=r_indices.device) > 0.85 # 15% edge retention used to regularize and prevent over-smoothing
                     r_indices = r_indices[keep_mask]
                     c_indices = c_indices[keep_mask]
                     
@@ -160,8 +161,7 @@ class TypeSpecificGATLayer(nn.Module):
                 
                 chunks.append(chunk_out)
                 
-                # FIX 3: Explicit Intra-Loop Garbage Collection
-                # Forces Autograd to release the VRAM immediately before moving to the next chunk
+                # Explicit intra-loop memory deallocation to force autograd to release tensor buffers
                 del r_indices, c_indices, attn_dst, attn_src, e_ij, exp_e, exp_sum, alpha, src_features, weighted_messages
 
             return torch.cat(chunks, dim=0)
@@ -171,13 +171,13 @@ class TypeSpecificGATLayer(nn.Module):
         H_p = H[N_u: N_u + N_p]
         H_s = H[N_u + N_p:]
 
-        # 1. Initialize Accumulators
+        # 1. Initialize node representation accumulators
         H_u_out = torch.zeros_like(H_u)
         H_p_out = torch.zeros_like(H_p)
         H_s_out = torch.zeros_like(H_s)
 
         # --------------------------------------------------
-        # STREAM 1: Purchase Edges
+        # Stream 1: User-Product (Purchase) Edges
         # --------------------------------------------------
         Wh_u_pu = self.W_pu(H_u).contiguous()
         Wh_p_pu = self.W_pu(H_p).contiguous()
@@ -192,7 +192,7 @@ class TypeSpecificGATLayer(nn.Module):
         del Wh_u_pu, Wh_p_pu 
 
         # --------------------------------------------------
-        # STREAM 2: Selling Edges
+        # Stream 2: Product-Seller (Selling) Edges
         # --------------------------------------------------
         Wh_p_ps = self.W_ps(H_p).contiguous()
         Wh_s_ps = self.W_ps(H_s).contiguous()
@@ -207,7 +207,7 @@ class TypeSpecificGATLayer(nn.Module):
         del Wh_p_ps, Wh_s_ps 
 
         # --------------------------------------------------
-        # STREAM 3: User Edges
+        # Stream 3: User-User Edges
         # --------------------------------------------------
         Wh_u_uu = self.W_uu(H_u).contiguous()
         
@@ -218,8 +218,8 @@ class TypeSpecificGATLayer(nn.Module):
             
         del Wh_u_uu
 
-        # 2. In-Place Activations
-        H_u_out = F.elu(H_u_out / 2.0, inplace=True)
+        # 2. Apply non-linear activation functions (in-place for memory efficiency)
+        H_u_out = F.elu(H_u_out / 2.0, inplace=True) # Scaled by 2 to normalize variance from multiple incoming edge streams
         H_p_out = F.elu(H_p_out / 2.0, inplace=True)
         H_s_out = F.elu(H_s_out, inplace=True)
 
@@ -230,6 +230,10 @@ class TypeSpecificGATLayer(nn.Module):
 # 3. Two-Layer GAT + Anomaly Scoring Head
 # ---------------------------------------------------------
 class TripleStreamGAT(nn.Module):
+    """
+    Two-layer GAT processing User, Product, and Seller node embeddings.
+    Returns: (logits array of anomaly scores, final hidden representations)
+    """
     def __init__(self, in_dim=128, hidden_dim=128, out_dim=128):
         super().__init__()
         self.gat1 = TypeSpecificGATLayer(in_dim, hidden_dim)
@@ -250,8 +254,8 @@ def supervised_loss(logits, labeled_idx, labeled_y):
     return F.binary_cross_entropy_with_logits(logits_labeled, labeled_y)
 
 def unsupervised_loss(logits, epu_rp, epu_ci, eps_rp, eps_ci, euu_rp, euu_ci, N_u, num_samples=5000):
-    # BUG FIX: Apply sigmoid to convert raw logits into bounded anomaly scores (s_i).
-    # Equation 17 requires the difference between scores (0 to 1), not unbounded logits.
+    # Apply sigmoid activation to transform raw logits into bounded anomaly probabilities.
+    # This aligns with the theoretical formulation of the unsupervised loss objective.
     scores = torch.sigmoid(logits)
     
     def edge_loss(rp, ci, src_offset):
@@ -262,7 +266,7 @@ def unsupervised_loss(logits, epu_rp, epu_ci, eps_rp, eps_ci, euu_rp, euu_ci, N_
         
         idx = torch.randint(0, len(src), (min(num_samples, len(src)),), device=rp.device)
         
-        # Calculate the squared difference using the sigmoid scores
+        # Compute the mean squared difference of anomaly scores across sampled edges
         diff = scores[src[idx]] - scores[dst[idx]]
         return (diff ** 2).mean()
 
@@ -316,7 +320,7 @@ def train_gat():
     model = TripleStreamGAT(in_dim=128, hidden_dim=128, out_dim=128).cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
-    # RE-ENABLE MIXED PRECISION TO SAVE VRAM
+    # Initialize gradient scaler for Automatic Mixed Precision (AMP)
     scaler = torch.amp.GradScaler('cuda') 
    
     LAMBDA, EPOCHS, best_val_auc = 0.5, 100, 0.0
@@ -326,7 +330,7 @@ def train_gat():
     t0 = time.time()
 
     for epoch in range(1, EPOCHS + 1):
-        model.train() # Engages Native PyTorch Math for Autograd
+        model.train() # Enable training mode for autograd tracking
         optimizer.zero_grad()
 
         with torch.amp.autocast('cuda'):
@@ -339,40 +343,37 @@ def train_gat():
         scaler.step(optimizer)
         scaler.update()
         
-        # 1. Save the scalar values for logging BEFORE deleting the massive tensors
+        # 1. Cache scalar loss values for logging prior to tensor deallocation
         log_sup = l_sup.item()
         log_unsup = l_unsup.item()
         log_loss = loss.item()
 
-        # 2. Obliterate the computational graph from VRAM
+        # 2. Manually deallocate computational graph tensors to free GPU memory
         del logits, loss, l_sup, l_unsup
         
         if epoch % 10 == 0:
-            model.eval() # Automatically engages custom `warp_gat` CUDA kernel
+            model.eval() # Enable evaluation mode (triggers the optimized custom warp_gat CUDA kernel)
             with torch.no_grad():
-                # Temporarily cast validation inputs for the C++ kernel
+                # Format validation inputs for compatibility with the C++ extension
                 val_logits, _ = model(Z, *graph_args)
                 
                 val_s = torch.sigmoid(val_logits[va_idx.cuda()]).cpu().numpy()
                 val_l = va_y.cpu().numpy()
                 val_auc = compute_auc_roc(val_s, val_l)
                 
-                # Free validation memory
+                # Release validation tensor memory
                 del val_logits
 
-            # 3. Print using the saved scalars!
+            # 3. Output iteration metrics
             print(f"Epoch {epoch:03d} | L_sup: {log_sup:.4f} | L_unsup: {log_unsup:.4f} | L_total: {log_loss:.4f} | Val AUC-ROC: {val_auc:.4f}")
 
             if val_auc > best_val_auc:
                 best_val_auc = val_auc
                 best_state   = {k: v.clone() for k, v in model.state_dict().items()}
                 
-        # 4. Sweep the fragmentation out of the GPU
+        # 4. Empty the CUDA cache to minimize memory fragmentation
         torch.cuda.empty_cache()
 
-    print(f"\nTraining Complete in {time.time() - t0:.2f}s | Best Val AUC-ROC: {best_val_auc:.4f}")
-
-    print("\nEvaluating best checkpoint on held-out test set with Custom CUDA Kernel...")
     model.load_state_dict(best_state)
     model.eval() 
     with torch.no_grad():
@@ -381,12 +382,21 @@ def train_gat():
         te_l = te_y.cpu().numpy()
         test_auc = compute_auc_roc(te_s, te_l)
 
-    print(f"Test AUC-ROC: {test_auc:.4f}")
-
     all_scores = torch.sigmoid(test_logits).cpu().numpy()
     np.save('anomaly_scores_stage2.npy', all_scores)
     np.save('Z_stage2.npy', Z_final.cpu().numpy())
     torch.save(best_state, 'gat_stage2_best.pt')
+    
+    # Final results
+    print("\n==================================================")
+    print(" STAGE 2: TRAINING SUMMARY")
+    print("==================================================")
+    print(f"Total Time:        {time.time() - t0:.2f} seconds")
+    print(f"Best Val AUC-ROC:  {best_val_auc:.4f}")
+    print(f"Test AUC-ROC:      {test_auc:.4f}")
+    print("==================================================\n")
+    print(f"[Success] Exported anomaly scores and embeddings for {num_nodes:,} nodes.")
+    print("Proceed to Performance Evaluation.")
 
 if __name__ == "__main__":
     train_gat()
