@@ -365,7 +365,7 @@ def train_gae():
 
     train_time = time.time() - t0
 
-    # ─── PRESENTATION SUMMARY BLOCK ───
+    # ─── SUMMARY BLOCK ───
     print("\n" + "═" * 60)
     print("  STAGE 1: TRAINING SUMMARY")
     print("═" * 60)
