@@ -39,3 +39,11 @@ NOTE: make sure you have added `warp_gat_kernel.cu` inside cuda_spmm (if doing i
 ```
 python3 stage2.py
 ```
+
+## performance evaluation
+
+```
+python3 performance_evaluation.py
+```
+
+P.S.: check input file paths for all these codes
