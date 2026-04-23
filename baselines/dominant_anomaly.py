@@ -14,6 +14,9 @@ def parse(path):
             yield json.loads(l)
 
 def clean_price_string(price_str):
+    """
+    Extracts continuous float price values from irregular or corrupted string formats.
+    """
     if not price_str: return 0.0
     if isinstance(price_str, (int, float)): return float(price_str)
     found = re.findall(r"[-+]?\d*\.\d+|\d+", str(price_str))
@@ -21,6 +24,11 @@ def clean_price_string(price_str):
 
 # --- MODEL DEFINITION ---
 class HeteroDOMINANT(torch.nn.Module):
+    """
+    Heterogeneous adaptation of the DOMINANT autoencoder architecture.
+    Utilizes GraphSAGE convolution to aggregate localized neighborhood structures 
+    across multiple bipartite edge types (Buyer-Product, Seller-Product).
+    """
     def __init__(self, hidden_channels, out_channels):
         super().__init__()
         # Dual-stage logic: Shared encoder for heterogeneous nodes
@@ -42,13 +50,15 @@ class HeteroDOMINANT(torch.nn.Module):
         h_dict = self.encoder(x_dict, edge_index_dict)
         h_dict = {k: self.bn_map[k](F.leaky_relu(v)) for k, v in h_dict.items() if k in self.bn_map}
         z_dict = {k: self.proj(v) for k, v in h_dict.items()}
-        # Attribute reconstruction for Stage 1
+        # Attribute reconstruction for Stage 1 error calculation
         x_hat = torch.sigmoid(self.attr_decoder(z_dict['product']))
         return z_dict, x_hat
 
 # --- MAIN EXECUTION ---
 def run_dominant():
     start_time = time.time()
+
+    # Enforce deterministic execution for reproducible baseline comparisons
     seed = 42
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -68,6 +78,7 @@ def run_dominant():
             'asin': asin, 
             'price': clean_price_string(d.get('price')),
             'brand': brand,
+            # Feature Hashing modulo 1000 bounds the categorical vocabulary size
             'cat_id': hash(str(d.get('categories', [['None']])[0][0])) % 1000
         })
         brand_map[asin] = brand
@@ -88,7 +99,7 @@ def run_dominant():
 
     # HeteroData Construction
     data = HeteroData()
-    scaler = MinMaxScaler() # Normalization
+    scaler = MinMaxScaler() # Ensure stable gradient flow during reconstruction
     data['product'].x = torch.tensor(scaler.fit_transform(df_p[['price', 'cat_id']].values), dtype=torch.float)
     data['buyer'].x, data['seller'].x = torch.ones((len(buyer_list), 1)), torch.ones((len(brand_to_idx), 1))
     
@@ -107,6 +118,7 @@ def run_dominant():
     data = data.to(device)
 
     print("\nTraining Unsupervised Encoder-Decoder...")
+    # 251 epochs selected empirically to allow convergence of the reconstruction loss
     for epoch in range(251):
         optimizer.zero_grad()
         z_dict, x_hat = model(data.x_dict, data.edge_index_dict)
@@ -119,7 +131,7 @@ def run_dominant():
         z_dict, x_hat = model(data.x_dict, data.edge_index_dict)
         prod_scores = torch.norm(x_hat - data['product'].x, dim=1).cpu().numpy()
         
-        # Aggregate scores for Buyers
+        # Aggregate scores for Buyers by averaging the reconstruction error of their reviewed products
         b_ei = data['buyer', 'reviews', 'product'].edge_index.cpu().numpy()
         buyer_scores = np.zeros(data['buyer'].num_nodes)
         b_counts = np.zeros(data['buyer'].num_nodes)
@@ -128,23 +140,24 @@ def run_dominant():
             b_counts[b_idx] += 1
         buyer_scores = buyer_scores / np.maximum(b_counts, 1)
 
-    # Thresholds
-   
+    # ---------------------------------------------------------
+    # Thresholding & Classification 
+    # ---------------------------------------------------------
+    
+    # Product Threshold: 2.2 std deviations represents roughly the 98.6th percentile, capturing severe product-level structural deviations.
     thresh_p = np.mean(prod_scores) + 2.2 * np.std(prod_scores)
-  
+    
+    # Buyer Threshold: 4.0 std deviations represents extreme statistical outliers (99.99th percentile), minimizing false positives arising from normal behavioral variance.
     thresh_b = np.mean(buyer_scores) + 4.0 * np.std(buyer_scores)
     
     anom_prod = np.where(prod_scores > thresh_p)[0]
     anom_buyer = np.where(buyer_scores > thresh_b)[0]
 
-    
-
-    # Initialize global scores with zeros (or a very low value)
+    # Initialize global scores aligned with evaluation script mapping bounds
     total_nodes = data['buyer'].num_nodes + data['product'].num_nodes + data['seller'].num_nodes
     global_scores = np.zeros(total_nodes)
 
     # 1. Fill User scores (Indices 0 to N_u-1)
-    # Note: Ensure the index order matches your mapping.json/node_counts.json
     global_scores[:data['buyer'].num_nodes] = buyer_scores
 
     # 2. Fill Product scores (Indices N_u to N_u + N_p - 1)
@@ -153,9 +166,9 @@ def run_dominant():
     global_scores[start_p:end_p] = prod_scores
 
     # 3. Seller scores (Indices end_p to end_p + N_s - 1) 
-    # Usually left as 0 if not evaluated, but ensures array size is correct
+    # Maintained as 0 as they are not evaluated, ensuring structural consistency
     
-    # Save the file for use in the Performance Evaluation Script
+    # Save the file
     np.save('dominant_anomalies.npy', global_scores)
     print("\n" + "="*50)
     print("TARGETED BASELINE RESULTS")
