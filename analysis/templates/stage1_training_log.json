@@ -1,0 +1,26 @@
+{
+    "_comment": "Paste your Stage 1 terminal output metrics here. Values are logged every 10 epochs.",
+    "_instructions": "After running stage1.py, copy the epoch-level metrics from the terminal output into this file. Each entry corresponds to one logging line (every 10th epoch).",
+    "epochs": [
+        {"epoch": 10,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 20,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 30,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 40,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 50,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 60,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 70,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 80,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 90,  "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 100, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 110, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 120, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 130, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 140, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 150, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 160, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 170, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 180, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 190, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0},
+        {"epoch": 200, "loss": 0.0, "p_pos": 0.0, "p_neg": 0.0, "margin": 0.0, "edge_auc": 0.0}
+    ]
+}
