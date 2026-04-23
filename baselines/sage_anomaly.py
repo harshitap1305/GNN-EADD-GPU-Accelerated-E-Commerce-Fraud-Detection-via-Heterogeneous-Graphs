@@ -151,6 +151,33 @@ def run_baseline():
     print(f"Product Anomalies (Meta):   {len(meta_anomalies)}")
     print(f"Review Anomalies (5-Core):  {len(core_anomalies)}")
     print("="*50)
+# --- ADDED: GENERATE GLOBAL SCORES FOR EVALUATION SCRIPT ---
+    # According to performance_evaluation.py, nodes are ordered: Users -> Products -> Sellers
+    # We need to know N_u (number of users) to place product scores in the right slot.
+    
+    # Load counts to find the offset for product indices
+    try:
+        with open('data/node_counts.json', 'r') as f:
+            counts = json.load(f)
+        N_u = counts['users']
+        N_total = counts['total']
+    except FileNotFoundError:
+        # Fallback if file is in root
+        with open('node_counts.json', 'r') as f:
+            counts = json.load(f)
+        N_u = counts['users']
+        N_total = counts['total']
 
+    # Initialize a global array for all nodes
+    global_scores = np.zeros(N_total)
+
+    # Place the product scores into the correct global index range [N_u : N_u + num_products]
+    # 'scores' contains the L2 norm for each product indexed 0 to num_nodes-1
+    global_scores[N_u : N_u + len(scores)] = scores
+
+    # Save as sage_anomalies.npy for the Performance Evaluation Script
+    np.save('sage_anomalies.npy', global_scores)
+    print(f"Global scores saved to 'sage_anomalies.npy' (Shape: {global_scores.shape})")
+    # ------------------------------------------------------------
 if __name__ == "__main__":
     run_baseline()
