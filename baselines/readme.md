@@ -8,8 +8,6 @@ The baselines currently implemented are:
 2. **HeteroDOMINANT (`dominant.py`)**
 3. **GraphSAGE Autoencoder (`sage_anomaly.py`)**
 
-> Note: This README is intended as a *high-level* technical description. For exact implementation details, refer to the corresponding Python scripts.
-
 ---
 
 ## 1) Heuristic + K-Core labeling (`label_data.py`)
