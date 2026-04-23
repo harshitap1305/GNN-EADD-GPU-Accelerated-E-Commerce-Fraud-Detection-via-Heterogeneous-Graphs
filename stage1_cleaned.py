@@ -1,3 +1,11 @@
+"""
+Stage 1: Unsupervised Graph Autoencoder (GAE)
+==============================================================================
+Generates structural node embeddings for heterogeneous e-commerce networks.
+Utilizes a memory-efficient SpMM CUDA kernel and a contrastive learning 
+objective with temperature annealing and type-consistent negative sampling.
+"""
+
 import os
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
@@ -13,9 +21,14 @@ import custom_spmm
 
 
 # ---------------------------------------------------------
-# Autograd wrapper for custom SpMM CUDA kernel (unchanged)
+# Memory-Efficient SpMM Autograd Wrapper
 # ---------------------------------------------------------
 class SpMM_Autograd(torch.autograd.Function):
+    """
+    Custom Autograd function bridging PyTorch with the C++/CUDA SpMM kernel.
+    Implements edge-chunked backpropagation to strictly bound VRAM usage,
+    preventing Out-Of-Memory (OOM) errors on high-degree graphs.
+    """
     @staticmethod
     def forward(ctx, rp, ci, edge_weights, X):
         ctx.save_for_backward(rp, ci, edge_weights)
@@ -34,15 +47,19 @@ class SpMM_Autograd(torch.autograd.Function):
             end_idx = min(start_idx + CHUNK_SIZE, N)
             sub_rp = rp[start_idx: end_idx + 1]
             sub_row_lengths = sub_rp[1:] - sub_rp[:-1]
+            
             if sub_row_lengths.sum() == 0:
                 continue
+                
             start_edge = sub_rp[0].item()
             end_edge   = sub_rp[-1].item()
             sub_ci      = ci[start_edge: end_edge].long()
             sub_weights = edge_weights[start_edge: end_edge].unsqueeze(1)
             local_grad  = grad_output[start_idx: end_idx]
+            
             expanded_grad = torch.repeat_interleave(local_grad, sub_row_lengths, dim=0)
             scaled_grad   = (expanded_grad * sub_weights).to(torch.float32)
+            
             grad_X_fp32.scatter_add_(
                 0, sub_ci.unsqueeze(1).expand_as(scaled_grad), scaled_grad
             )
@@ -51,9 +68,10 @@ class SpMM_Autograd(torch.autograd.Function):
 
 
 # ---------------------------------------------------------
-# 1. Graph loading & edge weight computation (unchanged)
+# Graph Initialization & Normalization
 # ---------------------------------------------------------
 def compute_symmetric_edge_weights(rp, ci, global_deg, src_offset):
+    """Computes exact GCN symmetric normalization mapping directly via Global IDs."""
     row_lengths = rp[1:] - rp[:-1]
     src_local  = torch.repeat_interleave(
         torch.arange(len(rp) - 1, device=rp.device), row_lengths
@@ -65,6 +83,10 @@ def compute_symmetric_edge_weights(rp, ci, global_deg, src_offset):
 
 
 def load_graph_data():
+    """
+    Loads topology from CSR binaries and applies L2 normalization to 
+    input features to ensure uniform directional scaling prior to propagation.
+    """
     print("Loading Graph Topology from Binaries...")
     with open('node_counts.json', 'r') as f:
         counts = json.load(f)
@@ -115,14 +137,20 @@ def load_graph_data():
 
 
 # ---------------------------------------------------------
-# 2. Triple-Stream GAE Architecture (2-Layer, 128-D)
+# Triple-Stream GCN Architecture
 # ---------------------------------------------------------
 class TripleStreamGAE(nn.Module):
+    """
+    Two-layer Heterogeneous Graph Convolutional Network.
+    Employs independent weight matrices for distinct edge types and 
+    explicitly models self-loops to preserve node identity.
+    """
     def __init__(self, in_dim=128, hidden_dim=128, out_dim=128, N_u=0, N_p=0):
         super().__init__()
         self.N_u = N_u
         self.N_p = N_p
 
+        # Relation-specific projection matrices
         self.W1_pu = nn.Linear(in_dim,     hidden_dim, bias=True)
         self.W1_uu = nn.Linear(in_dim,     hidden_dim, bias=True)
         self.W1_up = nn.Linear(in_dim,     hidden_dim, bias=True)
@@ -135,6 +163,7 @@ class TripleStreamGAE(nn.Module):
         self.W2_ps = nn.Linear(hidden_dim, out_dim,    bias=True)
         self.W2_sp = nn.Linear(hidden_dim, out_dim,    bias=True)
 
+        # Self-loop projection matrices
         self.W1_self_u = nn.Linear(in_dim,     hidden_dim, bias=False)
         self.W1_self_p = nn.Linear(in_dim,     hidden_dim, bias=False)
         self.W1_self_s = nn.Linear(in_dim,     hidden_dim, bias=False)
@@ -143,6 +172,7 @@ class TripleStreamGAE(nn.Module):
         self.W2_self_p = nn.Linear(hidden_dim, out_dim,    bias=False)
         self.W2_self_s = nn.Linear(hidden_dim, out_dim,    bias=False)
 
+        # Asynchronous CUDA streams for parallel message passing
         self.stream_u = torch.cuda.Stream()
         self.stream_p = torch.cuda.Stream()
         self.stream_s = torch.cuda.Stream()
@@ -152,11 +182,11 @@ class TripleStreamGAE(nn.Module):
                        eps_rp, eps_ci, eps_w, eps_T_rp, eps_T_ci, eps_T_w,
                        euu_rp, euu_ci, euu_w, layer=1):
 
-        W_pu    = self.W1_pu    if layer == 1 else self.W2_pu
-        W_uu    = self.W1_uu    if layer == 1 else self.W2_uu
-        W_up    = self.W1_up    if layer == 1 else self.W2_up
-        W_ps    = self.W1_ps    if layer == 1 else self.W2_ps
-        W_sp    = self.W1_sp    if layer == 1 else self.W2_sp
+        W_pu     = self.W1_pu     if layer == 1 else self.W2_pu
+        W_uu     = self.W1_uu     if layer == 1 else self.W2_uu
+        W_up     = self.W1_up     if layer == 1 else self.W2_up
+        W_ps     = self.W1_ps     if layer == 1 else self.W2_ps
+        W_sp     = self.W1_sp     if layer == 1 else self.W2_sp
         W_self_u = self.W1_self_u if layer == 1 else self.W2_self_u
         W_self_p = self.W1_self_p if layer == 1 else self.W2_self_p
         W_self_s = self.W1_self_s if layer == 1 else self.W2_self_s
@@ -204,9 +234,10 @@ class TripleStreamGAE(nn.Module):
 
 
 # ---------------------------------------------------------
-# 3. Type-Consistent Negative Sampler
+# Heterogeneous Edge Sampling
 # ---------------------------------------------------------
 def sample_edges(rp, ci, src_offset, num_samples):
+    """Uniformly samples positive structural edges from the CSR adjacency matrix."""
     row_lengths = rp[1:] - rp[:-1]
     src = torch.repeat_interleave(
         torch.arange(len(rp) - 1, device=rp.device), row_lengths
@@ -222,16 +253,26 @@ def sample_edges(rp, ci, src_offset, num_samples):
 
 
 def type_consistent_negatives(pos_dst, dst_type_start, dst_type_end):
+    """Generates negative edges that respect the bipartite constraints of the network."""
     n = len(pos_dst)
     return torch.randint(
         dst_type_start, dst_type_end, (n,), device=pos_dst.device
     ).long()
 
+
+# Heterogeneous Sampling Budget
+# Over-samples minority structures (EPS) while constraining majority cliques (EUU)
 EPU_SAMPLE  = 30_000
 EPS_SAMPLE  =  8_000
 EUU_SAMPLE  = 12_000
 
+
 def get_temperature(epoch, warmup_epochs=20, max_tau=10.0, min_tau=2.0):
+    """
+    Temperature annealing schedule for cosine similarity scaling.
+    Prevents early sigmoid saturation to maintain gradient flow, transitioning
+    to sharper decision boundaries in later epochs.
+    """
     if epoch <= warmup_epochs:
         return min_tau + (max_tau - min_tau) * (epoch / warmup_epochs)
     progress = (epoch - warmup_epochs) / (200 - warmup_epochs)
@@ -240,7 +281,7 @@ def get_temperature(epoch, warmup_epochs=20, max_tau=10.0, min_tau=2.0):
 
 
 # ---------------------------------------------------------
-# 4. Training
+# Primary Training Loop
 # ---------------------------------------------------------
 def train_gae():
     (X, N_u, N_p, N_s, num_nodes,
@@ -264,7 +305,6 @@ def train_gae():
     print(f"  Edge sampling budget — EPU:{EPU_SAMPLE:,}  EPS:{EPS_SAMPLE:,}  EUU:{EUU_SAMPLE:,}")
     t0 = time.time()
     
-    # Store these variables to pass to the final print block
     pos_prob = 0.0
     neg_prob = 0.0
     edge_auc = 0.0
@@ -314,7 +354,6 @@ def train_gae():
                 neg_prob = torch.sigmoid(neg_score * tau).mean().item()
                 margin = pos_prob - neg_prob
                 
-                # Calculate Unsupervised Link Prediction AUC
                 labels_np = labels.cpu().numpy()
                 preds_np = (preds * tau).detach().cpu().numpy()
                 try:
@@ -334,6 +373,7 @@ def train_gae():
     print(f"  Final Loss:        {loss.item():.4f}")
     print(f"  Final Separation:  P(pos)={pos_prob:.3f} vs P(neg)={neg_prob:.3f}")
     print(f"  Link Predict AUC:  {edge_auc:.4f}")
+    print("  Stage 2 Input:     Z_embeddings_stage1.npy")
     print("═" * 60)
 
     model.eval()
