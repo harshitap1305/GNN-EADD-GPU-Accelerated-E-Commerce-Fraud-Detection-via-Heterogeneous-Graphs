@@ -177,7 +177,7 @@ def run_baseline():
 
     # Save as sage_anomalies.npy for the Performance Evaluation Script
     np.save('sage_anomalies.npy', global_scores)
-    print(f"Global scores saved to 'sage_anomalies.npy' (Shape: {global_scores.shape})")
+    print(f"Global scores saved to 'sage_anomalies.npy' ")
     # ------------------------------------------------------------
 if __name__ == "__main__":
     run_baseline()
