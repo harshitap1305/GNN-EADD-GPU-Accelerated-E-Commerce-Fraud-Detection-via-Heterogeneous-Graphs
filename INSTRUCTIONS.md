@@ -46,4 +46,29 @@ python3 stage2.py
 python3 performance_evaluation.py
 ```
 
+# Baselines
+
+```
+DOMINANT (Deep Anomaly Detection on Attributed Networks).
+GraphSAGE (SAmple and aggreGatE).
+```
+## Dominant
+
+```
+python3 baselines/dominant_anomaly.py
+```
+
+## GraphSAGE
+
+```
+python3 baselines/sage_anomaly.py
+```
+
+## baselines performance evaluation
+
+```
+python3 baselines/baseline_performance_metrics.py
+```
+
+
 P.S.: check input file paths for all these codes
