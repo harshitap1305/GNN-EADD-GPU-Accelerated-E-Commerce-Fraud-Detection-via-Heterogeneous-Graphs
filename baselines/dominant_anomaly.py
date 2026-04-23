@@ -137,6 +137,26 @@ def run_dominant():
     anom_prod = np.where(prod_scores > thresh_p)[0]
     anom_buyer = np.where(buyer_scores > thresh_b)[0]
 
+    
+
+    # Initialize global scores with zeros (or a very low value)
+    total_nodes = data['buyer'].num_nodes + data['product'].num_nodes + data['seller'].num_nodes
+    global_scores = np.zeros(total_nodes)
+
+    # 1. Fill User scores (Indices 0 to N_u-1)
+    # Note: Ensure the index order matches your mapping.json/node_counts.json
+    global_scores[:data['buyer'].num_nodes] = buyer_scores
+
+    # 2. Fill Product scores (Indices N_u to N_u + N_p - 1)
+    start_p = data['buyer'].num_nodes
+    end_p = start_p + data['product'].num_nodes
+    global_scores[start_p:end_p] = prod_scores
+
+    # 3. Seller scores (Indices end_p to end_p + N_s - 1) 
+    # Usually left as 0 if not evaluated, but ensures array size is correct
+    
+    # Save the file for use in the Performance Evaluation Script
+    np.save('dominant_anomalies.npy', global_scores)
     print("\n" + "="*50)
     print("TARGETED BASELINE RESULTS")
     print("="*50)
@@ -144,6 +164,7 @@ def run_dominant():
     print(f"Product Anomalies (Meta):   {len(anom_prod)}")
     print(f"Review Anomalies (5-Core):  {len(anom_buyer)}")
     print("="*50)
-
+    print(f"Successfully saved global scores to 'dominant_anomalies.npy' (Shape: {global_scores.shape})")
+    
 if __name__ == "__main__":
     run_dominant()
