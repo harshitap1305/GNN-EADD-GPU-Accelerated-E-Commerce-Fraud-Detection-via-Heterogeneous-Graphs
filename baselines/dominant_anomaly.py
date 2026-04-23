@@ -164,7 +164,7 @@ def run_dominant():
     print(f"Product Anomalies (Meta):   {len(anom_prod)}")
     print(f"Review Anomalies (5-Core):  {len(anom_buyer)}")
     print("="*50)
-    print(f"Successfully saved global scores to 'dominant_anomalies.npy' (Shape: {global_scores.shape})")
+    print(f"Successfully saved global scores to 'dominant_anomalies.npy' ")
     
 if __name__ == "__main__":
     run_dominant()
