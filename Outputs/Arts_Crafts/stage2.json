@@ -1,0 +1,31 @@
+{
+  "script": "stage2.py",
+  "initialization": {
+    "loading_graph_topology": "from Binaries",
+    "loading_features": "Stage 1 embeddings (Z) as node features"
+  },
+  "training_config": {
+    "type": "Semi-Supervised GAT Fine-Tuning (Hybrid Mode)"
+  },
+  "epoch_logs": [
+    {"epoch": 10, "l_sup": 0.6033, "l_unsup": 0.0049, "l_total": 0.6058, "val_auc_roc": 0.9614},
+    {"epoch": 20, "l_sup": 0.4424, "l_unsup": 0.0610, "l_total": 0.4729, "val_auc_roc": 0.9618},
+    {"epoch": 30, "l_sup": 0.3900, "l_unsup": 0.0866, "l_total": 0.4333, "val_auc_roc": 0.9672},
+    {"epoch": 40, "l_sup": 0.3763, "l_unsup": 0.0890, "l_total": 0.4208, "val_auc_roc": 0.9687},
+    {"epoch": 50, "l_sup": 0.3867, "l_unsup": 0.0951, "l_total": 0.4342, "val_auc_roc": 0.9697},
+    {"epoch": 60, "l_sup": 0.3822, "l_unsup": 0.0683, "l_total": 0.4164, "val_auc_roc": 0.9713},
+    {"epoch": 70, "l_sup": 0.3776, "l_unsup": 0.0710, "l_total": 0.4131, "val_auc_roc": 0.9717},
+    {"epoch": 80, "l_sup": 0.3793, "l_unsup": 0.0752, "l_total": 0.4169, "val_auc_roc": 0.9721},
+    {"epoch": 90, "l_sup": 0.3680, "l_unsup": 0.0708, "l_total": 0.4034, "val_auc_roc": 0.9727},
+    {"epoch": 100, "l_sup": 0.3654, "l_unsup": 0.0706, "l_total": 0.4007, "val_auc_roc": 0.9730}
+  ],
+  "training_summary": {
+    "total_time_seconds": 97.60,
+    "best_val_auc_roc": 0.9730,
+    "test_auc_roc": 0.9815
+  },
+  "export": {
+    "message": "Exported anomaly scores and embeddings for 386,539 nodes",
+    "total_nodes": 386539
+  }
+}

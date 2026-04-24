@@ -1,0 +1,35 @@
+{
+  "title": "GNN-EADD Stage 1 Preprocessing Statistics",
+  "node_counts": {
+    "V_u_users": 157212,
+    "V_p_products": 589356,
+    "V_s_sellers": 40705
+  },
+  "edge_counts_including_gcn_self_loops": {
+    "E_pu_user_to_product": 1277863,
+    "E_up_product_to_user": 1710007,
+    "E_ps_product_to_seller": 1149625,
+    "E_sp_seller_to_product": 600974,
+    "E_uu_user_to_user": 10432706
+  },
+  "feature_matrices": {
+    "dtype": "float16",
+    "dimensions": "128-D",
+    "V_p": {
+      "shape": [589356, 128],
+      "size_mb": 150.9
+    },
+    "V_u": {
+      "shape": [157212, 128],
+      "size_mb": 40.2
+    },
+    "V_s": {
+      "shape": [40705, 128],
+      "size_mb": 10.4
+    }
+  },
+  "total_expected_gpu_vram_footprint_gb": 0.20,
+  "pipeline_complete": {
+    "total_time_min": 15.5
+  }
+}

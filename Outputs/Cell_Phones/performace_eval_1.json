@@ -1,0 +1,49 @@
+{
+  "script": "performance_evaluation.py",
+  "initialization": {
+    "ingesting": "Ground Truth and Stage 2 Predictions",
+    "decision_boundaries": {
+      "user_threshold": {
+        "value": 0.811382,
+        "type": "82nd Percentile"
+      },
+      "product_threshold": {
+        "value": 0.500000,
+        "type": "Standard Midpoint"
+      }
+    }
+  },
+  "overall_detection_performance": {
+    "total_evaluated_nodes": 10084,
+    "actual_anomalies_1": 5042,
+    "normal_samples_0": 5042,
+    "metrics": {
+      "auc_roc": 0.9793,
+      "auc_pr": 0.9677,
+      "precision_at_100": 0.9900,
+      "recall_at_100": 0.0196,
+      "global_precision": 0.9378,
+      "global_recall": 0.9090,
+      "global_f1_score": 0.9232
+    },
+    "confusion_matrix": {
+      "true_negatives_0_to_0": 4738,
+      "false_positives_0_to_1": 304,
+      "false_negatives_1_to_0": 459,
+      "true_positives_1_to_1": 4583
+    }
+  },
+  "user_anomaly_performance": {
+    "evaluated_users": 1841,
+    "anomalies": 783,
+    "metrics": {
+      "auc_roc": 0.9498,
+      "auc_pr": 0.9344,
+      "precision_at_100": 0.9800,
+      "recall_at_100": 0.1252,
+      "subgroup_precision": 0.9759,
+      "subgroup_recall": 0.4138,
+      "subgroup_f1_score": 0.5812
+    }
+  }
+}

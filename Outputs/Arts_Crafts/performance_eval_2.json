@@ -1,0 +1,16 @@
+{
+  "script": "performance_evaluation.py",
+  "product_anomaly_performance": {
+    "evaluated_products": 4412,
+    "anomalies": 2358,
+    "metrics": {
+      "auc_roc": 0.9726,
+      "auc_pr": 0.9530,
+      "precision_at_100": 0.9400,
+      "recall_at_100": 0.0399,
+      "subgroup_precision": 0.9368,
+      "subgroup_recall": 1.0000,
+      "subgroup_f1_score": 0.9674
+    }
+  }
+}

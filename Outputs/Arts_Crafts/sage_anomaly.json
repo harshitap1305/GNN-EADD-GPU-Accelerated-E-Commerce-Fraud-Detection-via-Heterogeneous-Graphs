@@ -1,0 +1,39 @@
+{
+  "script": "baselines/sage_anomaly.py",
+  "steps": {
+    "step_1_4": {
+      "description": "Building Product Mapping from Metadata",
+      "parsing_meta": {
+        "items": 302988,
+        "time": "00:04",
+        "speed": "61008.85it/s"
+      }
+    },
+    "step_2_4": {
+      "description": "Building Structural Edges (also_buy/viewed)",
+      "building_edges": {
+        "items": 302988,
+        "time": "00:06",
+        "speed": "49506.44it/s"
+      }
+    },
+    "step_3_4": {
+      "description": "Scaling Product Features"
+    },
+    "step_4_4": {
+      "description": "Mapping Interaction Data (5-Core)",
+      "parsing_5core": {
+        "items": 494485,
+        "time": "00:02",
+        "speed": "204242.67it/s"
+      }
+    }
+  },
+  "training": "Unsupervised Encoder-Decoder",
+  "targeted_baseline_results": {
+    "total_processing_time_seconds": 26.21,
+    "product_anomalies_meta": 4500,
+    "review_anomalies_5core": 540
+  },
+  "output_file": "sage_anomalies.npy"
+}
