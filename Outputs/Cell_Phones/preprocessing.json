@@ -1,0 +1,87 @@
+{
+  "script": "data_preprocessing.py",
+  "pipeline": "GNN-EADD Stage 1 Preprocessing Pipeline (16GB RAM)",
+  "pass_1": {
+    "description": "Scanning Metadata for valid items and sellers / Scanning Reviews for valid users",
+    "node_counts": {
+      "users": 157212,
+      "products": 589356,
+      "sellers": 40705
+    }
+  },
+  "pass_2": {
+    "description": "Extracting Review Fraud Signatures (NLP Streaming)",
+    "model": "sentence-transformers/all-MiniLM-L6-v2"
+  },
+  "pass_3": {
+    "description": "Caching metadata and Chunk-Encoding text / Applying PCA to the 384-D text embeddings",
+    "sub_passes": {
+      "3A": "Building final V_p (product nodes, 128-D)",
+      "3B": "Building V_u (user nodes, 128-D)",
+      "3C": "Building V_s (seller nodes, 128-D)"
+    }
+  },
+  "pass_4": {
+    "description": "Building Unified CSR Topology Binaries",
+    "saved_files": [
+      "epu_row_ptr.bin / epu_col_idx.bin",
+      "epu_T_row_ptr.bin / epu_T_col_idx.bin",
+      "eps_row_ptr.bin / eps_col_idx.bin",
+      "eps_T_row_ptr.bin / eps_T_col_idx.bin",
+      "euu_row_ptr.bin / euu_col_idx.bin"
+    ]
+  },
+  "output_memmaps": {
+    "V_p_features": {
+      "shape": [589356, 128],
+      "size_mb": 150.9
+    },
+    "V_u_features": {
+      "shape": [157212, 128],
+      "size_mb": 40.2
+    },
+    "V_s_features": {
+      "shape": [40705, 128],
+      "size_mb": 10.4
+    },
+    "X_combined": {
+      "shape": [787273, 128],
+      "size_mb": 201.5
+    }
+  },
+  "preprocessing_statistics": {
+    "title": "GNN-EADD Stage 1 Preprocessing Statistics",
+    "node_counts": {
+      "V_u_users": 157212,
+      "V_p_products": 589356,
+      "V_s_sellers": 40705
+    },
+    "edge_counts_including_gcn_self_loops": {
+      "E_pu_user_to_product": 1277863,
+      "E_up_product_to_user": 1710007,
+      "E_ps_product_to_seller": 1149625,
+      "E_sp_seller_to_product": 600974,
+      "E_uu_user_to_user": 10432706
+    },
+    "feature_matrices": {
+      "dtype": "float16",
+      "dimensions": "128-D",
+      "V_p": {
+        "shape": [589356, 128],
+        "size_mb": 150.9
+      },
+      "V_u": {
+        "shape": [157212, 128],
+        "size_mb": 40.2
+      },
+      "V_s": {
+        "shape": [40705, 128],
+        "size_mb": 10.4
+      }
+    },
+    "total_expected_gpu_vram_footprint_gb": 0.20,
+    "pipeline_complete": {
+      "total_time_min": 15.5
+    }
+  }
+}

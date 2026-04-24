@@ -1,0 +1,49 @@
+{
+  "script": "train_stage1_gae.py",
+  "initialization": {
+    "loading_graph_topology": "from Binaries",
+    "computing": "Strict GCN Symmetric Normalization",
+    "mapping_features": "128-D Float16 Features directly from SSD"
+  },
+  "training_config": {
+    "type": "Unsupervised 2-Layer Training",
+    "edge_sampling_budget": {
+      "EPU": 30000,
+      "EPS": 8000,
+      "EUU": 12000
+    }
+  },
+  "epoch_logs": [
+    {"epoch": 10, "loss": 1.1314, "p_pos": 0.755, "p_neg": 0.510, "margin": 0.246, "edge_auc": 0.7293},
+    {"epoch": 20, "loss": 1.0863, "p_pos": 0.857, "p_neg": 0.381, "margin": 0.476, "edge_auc": 0.7558},
+    {"epoch": 30, "loss": 0.7834, "p_pos": 0.848, "p_neg": 0.323, "margin": 0.524, "edge_auc": 0.8031},
+    {"epoch": 40, "loss": 0.6927, "p_pos": 0.790, "p_neg": 0.278, "margin": 0.513, "edge_auc": 0.8331},
+    {"epoch": 50, "loss": 0.6117, "p_pos": 0.899, "p_neg": 0.278, "margin": 0.621, "edge_auc": 0.8656},
+    {"epoch": 60, "loss": 0.5651, "p_pos": 0.918, "p_neg": 0.270, "margin": 0.648, "edge_auc": 0.8806},
+    {"epoch": 70, "loss": 0.5262, "p_pos": 0.891, "p_neg": 0.256, "margin": 0.635, "edge_auc": 0.8821},
+    {"epoch": 80, "loss": 0.4807, "p_pos": 0.890, "p_neg": 0.256, "margin": 0.634, "edge_auc": 0.8904},
+    {"epoch": 90, "loss": 0.4633, "p_pos": 0.897, "p_neg": 0.264, "margin": 0.633, "edge_auc": 0.8939},
+    {"epoch": 100, "loss": 0.4139, "p_pos": 0.893, "p_neg": 0.276, "margin": 0.616, "edge_auc": 0.9077},
+    {"epoch": 110, "loss": 0.3957, "p_pos": 0.898, "p_neg": 0.281, "margin": 0.617, "edge_auc": 0.9135},
+    {"epoch": 120, "loss": 0.3891, "p_pos": 0.895, "p_neg": 0.289, "margin": 0.606, "edge_auc": 0.9149},
+    {"epoch": 130, "loss": 0.3792, "p_pos": 0.892, "p_neg": 0.296, "margin": 0.597, "edge_auc": 0.9187},
+    {"epoch": 140, "loss": 0.3711, "p_pos": 0.887, "p_neg": 0.307, "margin": 0.580, "edge_auc": 0.9223},
+    {"epoch": 150, "loss": 0.3707, "p_pos": 0.879, "p_neg": 0.322, "margin": 0.558, "edge_auc": 0.9245},
+    {"epoch": 160, "loss": 0.3696, "p_pos": 0.870, "p_neg": 0.332, "margin": 0.538, "edge_auc": 0.9266},
+    {"epoch": 170, "loss": 0.3747, "p_pos": 0.861, "p_neg": 0.344, "margin": 0.517, "edge_auc": 0.9272},
+    {"epoch": 180, "loss": 0.3764, "p_pos": 0.853, "p_neg": 0.351, "margin": 0.502, "edge_auc": 0.9289},
+    {"epoch": 190, "loss": 0.3826, "p_pos": 0.843, "p_neg": 0.359, "margin": 0.484, "edge_auc": 0.9291},
+    {"epoch": 200, "loss": 0.3815, "p_pos": 0.844, "p_neg": 0.358, "margin": 0.486, "edge_auc": 0.9282}
+  ],
+  "training_summary": {
+    "total_time_seconds": 3.03,
+    "final_loss": 0.3815,
+    "final_separation": "P(pos)=0.844 vs P(neg)=0.358",
+    "link_predict_auc": 0.9282,
+    "stage_2_input": "Z_embeddings_stage1.npy"
+  },
+  "export": {
+    "message": "Exported L2-normalized embeddings for 15,937 nodes",
+    "total_nodes": 15937
+  }
+}

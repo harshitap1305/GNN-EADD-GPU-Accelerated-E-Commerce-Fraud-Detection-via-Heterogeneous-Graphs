@@ -1,0 +1,80 @@
+{
+  "script": "baselines/baseline_performance_metrics.py",
+  "title": "BASELINE PERFORMANCE EVALUATION (Standardized)",
+  "graphsage_baseline_performance": {
+    "columns": ["Entity", "Count", "AUC-ROC", "AUC-PR", "Prec", "Rec", "F1", "Prec@100", "Rec@100"],
+    "rows": [
+      {
+        "entity": "User",
+        "count": 1841,
+        "auc_roc": 0.5000,
+        "auc_pr": 0.4253,
+        "prec": 0.4253,
+        "rec": 1.0000,
+        "f1": 0.5968,
+        "prec_at_100": 0.3700,
+        "rec_at_100": 0.0473
+      },
+      {
+        "entity": "Product",
+        "count": 8242,
+        "auc_roc": 0.5847,
+        "auc_pr": 0.6184,
+        "prec": 0.7248,
+        "rec": 0.2529,
+        "f1": 0.3750,
+        "prec_at_100": 0.8800,
+        "rec_at_100": 0.0207
+      },
+      {
+        "entity": "Global",
+        "count": 10083,
+        "auc_roc": 0.5838,
+        "auc_pr": 0.6000,
+        "prec": 0.6876,
+        "rec": 0.2476,
+        "f1": 0.3641,
+        "prec_at_100": 0.8800,
+        "rec_at_100": 0.0175
+      }
+    ]
+  },
+  "dominant_baseline_performance": {
+    "columns": ["Entity", "Count", "AUC-ROC", "AUC-PR", "Prec", "Rec", "F1", "Prec@100", "Rec@100"],
+    "rows": [
+      {
+        "entity": "User",
+        "count": 1841,
+        "auc_roc": 0.5059,
+        "auc_pr": 0.4236,
+        "prec": 0.4217,
+        "rec": 0.1788,
+        "f1": 0.2511,
+        "prec_at_100": 0.4100,
+        "rec_at_100": 0.0524
+      },
+      {
+        "entity": "Product",
+        "count": 8242,
+        "auc_roc": 0.6536,
+        "auc_pr": 0.6461,
+        "prec": 0.8302,
+        "rec": 0.2973,
+        "f1": 0.4378,
+        "prec_at_100": 0.7800,
+        "rec_at_100": 0.0183
+      },
+      {
+        "entity": "Global",
+        "count": 10083,
+        "auc_roc": 0.6109,
+        "auc_pr": 0.5999,
+        "prec": 0.6621,
+        "rec": 0.2398,
+        "f1": 0.3521,
+        "prec_at_100": 0.6600,
+        "rec_at_100": 0.0131
+      }
+    ]
+  }
+}

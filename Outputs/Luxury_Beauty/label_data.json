@@ -1,0 +1,39 @@
+{
+  "script": "label_data.py",
+  "steps": {
+    "step_1_6": {
+      "description": "Loading Product Metadata",
+      "metadata_items": 12299,
+      "time": "00:00",
+      "speed": "49322.72it/s"
+    },
+    "step_2_6": {
+      "description": "Loading Reviews",
+      "review_items": 34278,
+      "time": "00:00",
+      "speed": "126299.34it/s"
+    },
+    "step_3_6": {
+      "description": "Computing Graph Core Numbers"
+    },
+    "step_4_6": {
+      "description": "Flagging Outlier Products"
+    },
+    "step_5_6": {
+      "description": "Flagging Outlier Users"
+    },
+    "step_6_6": {
+      "description": "Saving Specific Output Files"
+    }
+  },
+  "results": {
+    "anomalous_products_found": 512,
+    "anomalous_users_found": 500
+  },
+  "files_created": [
+    "labelling_meta.csv",
+    "labelling_5core.csv",
+    "labelling_asin_meta.txt",
+    "labelling_asin_5_core.txt"
+  ]
+}
