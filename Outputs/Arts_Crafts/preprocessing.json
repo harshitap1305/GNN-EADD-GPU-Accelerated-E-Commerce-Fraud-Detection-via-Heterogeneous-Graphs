@@ -79,6 +79,9 @@
         "size_mb": 7.2
       }
     },
-    "total_expected_gpu_vram_footprint_gb": 0.10
+    "total_expected_gpu_vram_footprint_gb": 0.10,
+    "pipeline_complete": {
+      "total_time_min": 6.4
+    }
   }
 }
