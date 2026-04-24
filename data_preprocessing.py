@@ -24,8 +24,8 @@ nltk.download('vader_lexicon', quiet=True)
 
 # Configuration
 
-REVIEWS_FILE  = "AMAZON_FASHION_5.json"
-METADATA_FILE = "meta_AMAZON_FASHION.json"
+REVIEWS_FILE  = "Electronics_5.json"
+METADATA_FILE = "meta_Electronics.json"
 
 TEXT_DIM       = 96
 PROD_CAT_DIM   = 24
