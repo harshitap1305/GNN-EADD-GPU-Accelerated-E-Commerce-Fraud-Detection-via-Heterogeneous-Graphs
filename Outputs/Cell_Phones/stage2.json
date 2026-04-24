@@ -15,7 +15,7 @@
     {"epoch": 50, "l_sup": 0.4452, "l_unsup": 0.0667, "l_total": 0.4786, "val_auc_roc": 0.9767},
     {"epoch": 60, "l_sup": 0.4446, "l_unsup": 0.0595, "l_total": 0.4743, "val_auc_roc": 0.9779},
     {"epoch": 70, "l_sup": 0.4411, "l_unsup": 0.0638, "l_total": 0.4730, "val_auc_roc": 0.9788},
-    {"epoch": 80, "l_sup": 0.4303, "l_unsup": 0.0697, "l_total": 0.4654, "val_auc_roc": 0.9795},
+    {"epoch": 80, "l_sup": 0.4303, "l_unsup": 0.0701, "l_total": 0.4654, "val_auc_roc": 0.9795},
     {"epoch": 90, "l_sup": 0.4222, "l_unsup": 0.0697, "l_total": 0.4571, "val_auc_roc": 0.9804},
     {"epoch": 100, "l_sup": 0.4192, "l_unsup": 0.0748, "l_total": 0.4566, "val_auc_roc": 0.9811}
   ],
