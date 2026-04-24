@@ -16,7 +16,7 @@
   "epoch_logs": [
     {"epoch": 10, "loss": 1.0198, "p_pos": 0.737, "p_neg": 0.480, "margin": 0.256, "edge_auc": 0.7596},
     {"epoch": 20, "loss": 1.2975, "p_pos": 0.881, "p_neg": 0.332, "margin": 0.548, "edge_auc": 0.7700},
-    {"epoch": 30, "loss": 1.3107, "p_pos": 0.838, "p_neg": 0.379, "margin": 0.459, "edge_auc": 0.7477},
+    {"epoch": 30, "loss": 1.3107, "p_pos": 0.838, "p_neg": 0.379, "margin": 0.459, "edge_auc": 0.7627},
     {"epoch": 40, "loss": 1.1806, "p_pos": 0.888, "p_neg": 0.348, "margin": 0.540, "edge_auc": 0.7703},
     {"epoch": 50, "loss": 0.9723, "p_pos": 0.901, "p_neg": 0.327, "margin": 0.574, "edge_auc": 0.7914},
     {"epoch": 60, "loss": 0.7408, "p_pos": 0.820, "p_neg": 0.280, "margin": 0.540, "edge_auc": 0.8214},
